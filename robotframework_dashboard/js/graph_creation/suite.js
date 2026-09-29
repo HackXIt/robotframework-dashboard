@@ -3,8 +3,8 @@ import { get_statistics_graph_data } from '../graph_data/statistics.js';
 import { get_duration_graph_data } from '../graph_data/duration.js';
 import { get_graph_config } from '../graph_data/graph_config.js';
 import { build_tooltip_meta, lookup_tooltip_meta, format_status } from '../graph_data/tooltip_helpers.js';
-import { exclude_from_suite_data } from '../graph_data/helpers.js';
-import { setup_suites_in_suite_select } from '../filter.js';
+import { get_suite_data_exclusion } from '../graph_data/helpers.js';
+import { setup_suites_in_suite_select } from '../filter/section_selects.js';
 import { format_duration } from '../common.js';
 import { dataLabelConfig } from '../variables/chartconfig.js';
 import { settings } from '../variables/settings.js';
@@ -14,7 +14,6 @@ import { build_most_failed_config, build_most_time_consuming_config } from './co
 import { update_graphs_with_loading } from '../common.js';
 import { get_suite_stats_data } from '../graph_data/stats.js';
 
-// build functions
 function _build_suite_folder_donut_config(folder) {
     const data = get_donut_folder_graph_data("suite", filteredSuites, folder);
     const graphData = data[0]
@@ -121,7 +120,7 @@ function _build_suite_statistics_config() {
     const callbackData = data[1]
     const suiteSelectSuites = document.getElementById("suiteSelectSuites").value;
     const isCombined = suiteSelectSuites === "All Suites Combined";
-    const relevantSuites = filteredSuites.filter(s => !exclude_from_suite_data("suite", s));
+    const relevantSuites = get_relevant_suites();
     const tooltipMeta = build_tooltip_meta(relevantSuites, 'elapsed_s', isCombined);
     var config;
     if (settings.graphTypes.suiteStatisticsGraphType == "line") {
@@ -180,7 +179,7 @@ function _build_suite_duration_config() {
     const suiteSelectSuites = document.getElementById("suiteSelectSuites").value;
     const isCombined = suiteSelectSuites === "All Suites Combined";
     // Filter suites the same way get_duration_graph_data does, so tooltip meta matches
-    const relevantSuites = filteredSuites.filter(s => !exclude_from_suite_data("suite", s));
+    const relevantSuites = get_relevant_suites();
     const tooltipMeta = build_tooltip_meta(relevantSuites, 'elapsed_s', isCombined);
     var config;
     if (settings.graphTypes.suiteDurationGraphType == "bar") {
@@ -198,9 +197,14 @@ function _build_suite_duration_config() {
     return config;
 }
 
+function get_relevant_suites() {
+    const exclude_from_suite_data = get_suite_data_exclusion("suite");
+    return filteredSuites.filter(suite => !exclude_from_suite_data(suite));
+}
+
 function _get_suite_most_filtered_data() {
     if (!settings.switch.sectionFiltersApplySuite) return filteredSuites;
-    return filteredSuites.filter(s => !exclude_from_suite_data("suite", s));
+    return get_relevant_suites();
 }
 
 function _build_suite_most_failed_config() {
@@ -210,7 +214,6 @@ function _build_suite_most_time_consuming_config() {
     return build_most_time_consuming_config("suiteMostTimeConsuming", "suite", "Suite", _get_suite_most_filtered_data(), "onlyLastRunSuite");
 }
 
-// create functions
 function create_suite_folder_donut_graph(folder) {
     const suiteFolder = document.getElementById("suiteFolder")
     suiteFolder.innerText = folder == "" || folder == undefined ? "All" : folder;
@@ -233,7 +236,6 @@ function create_suite_duration_graph() { create_chart("suiteDurationGraph", _bui
 function create_suite_most_failed_graph() { create_chart("suiteMostFailedGraph", _build_suite_most_failed_config); }
 function create_suite_most_time_consuming_graph() { create_chart("suiteMostTimeConsumingGraph", _build_suite_most_time_consuming_config); }
 
-// update functions
 function update_suite_folder_donut_graph(folder) {
     const suiteFolder = document.getElementById("suiteFolder")
     suiteFolder.innerText = folder == "" || folder == undefined ? "All" : folder;
@@ -272,7 +274,6 @@ function create_suite_stat_widgets() {
     setVal('suiteStatAvgTimeValue',   format_duration(data.avgTime));
 }
 function update_suite_stat_widgets() { create_suite_stat_widgets(); }
-
 
 export {
     create_suite_statistics_graph,

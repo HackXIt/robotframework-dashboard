@@ -1,22 +1,33 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('@js/variables/globals.js', () => import('./mocks/globals.js'));
+vi.mock('@js/variables/data.js', () => import('./mocks/data.js'));
+vi.mock('@js/variables/graphs.js', () => import('./mocks/graphs.js'));
 
-import { strip_tz_suffix } from '@js/common.js';
+import { strip_tz_suffix, get_run_projects } from '@js/common.js';
+import {
+    dashboardPages,
+    get_active_page,
+    get_hidden_custom_filters,
+    get_transformed_data,
+    parse_custom_filters,
+    sort_wall_clock,
+} from '@js/filter/pipeline.js';
+import { runs } from '@js/variables/data.js';
+import { settings } from '@js/variables/settings.js';
+
+// settings is module level state, so it is restored between tests
+const defaultMenu = structuredClone(settings.menu);
+const defaultShow = structuredClone(settings.show);
+beforeEach(() => {
+    settings.menu = structuredClone(defaultMenu);
+    settings.show = structuredClone(defaultShow);
+});
 
 // Test the pure data transformation logic from filter.js.
 // Most filter functions in filter.js touch the DOM (document.getElementById),
 // so here we test the reusable logic patterns (sorting, data transformations)
 // that the filter functions rely on.
-
-// Reimplementation of sort_wall_clock from filter.js for direct testing
-function sort_wall_clock(data) {
-    return [...data].sort((a, b) => {
-        const ak = strip_tz_suffix(a.run_start);
-        const bk = strip_tz_suffix(b.run_start);
-        return ak < bk ? -1 : ak > bk ? 1 : 0;
-    });
-}
 
 describe('filter.js pure logic', () => {
     describe('sort_wall_clock logic', () => {
@@ -68,6 +79,47 @@ describe('filter.js pure logic', () => {
             const original = [...data];
             sort_wall_clock(data);
             expect(data).toEqual(original);
+        });
+
+        it('keeps the original order of items with the same wall-clock time', () => {
+            const data = [
+                { run_start: '2025-01-15 10:00:00', name: 'b' },
+                { run_start: '2025-01-15 09:00:00', name: 'c' },
+                { run_start: '2025-01-15 10:00:00+02:00', name: 'a' },
+            ];
+            expect(sort_wall_clock(data).map(item => item.name)).toEqual(['c', 'b', 'a']);
+        });
+    });
+
+    describe('get_transformed_data', () => {
+        beforeEach(() => {
+            runs.length = 0;
+            runs.push({ run_start: '2025-01-15 09:05:03.123+02:00', name: 'run1' });
+            settings.show.milliseconds = true;
+            settings.show.timezones = true;
+            settings.show.convertTimezone = false;
+        });
+
+        it('applies the run_start transformations of the settings', () => {
+            settings.show.milliseconds = false;
+            settings.show.timezones = false;
+            expect(get_transformed_data('runs')[0].run_start).toBe('2025-01-15 09:05:03');
+            expect(runs[0].run_start).toBe('2025-01-15 09:05:03.123+02:00');
+        });
+
+        it('reuses the transformed data while the settings stay the same', () => {
+            settings.show.milliseconds = false;
+            const first = get_transformed_data('runs');
+            expect(get_transformed_data('runs')).toBe(first);
+        });
+
+        it('transforms again when one of the settings changes', () => {
+            settings.show.milliseconds = false;
+            expect(get_transformed_data('runs')[0].run_start).toBe('2025-01-15 09:05:03+02:00');
+            settings.show.timezones = false;
+            expect(get_transformed_data('runs')[0].run_start).toBe('2025-01-15 09:05:03');
+            settings.show.milliseconds = true;
+            expect(get_transformed_data('runs')[0].run_start).toBe('2025-01-15 09:05:03.123');
         });
     });
 
@@ -156,8 +208,8 @@ describe('filter.js pure logic', () => {
                 { run_start: '2025-01-15 10:00:00', name: 'suite2' },
                 { run_start: '2025-01-15 11:00:00', name: 'suite3' },
             ];
-            const validRunStarts = filteredRuns.map(v => v.run_start);
-            const result = data.filter(v => validRunStarts.includes(v.run_start));
+            const validRunStarts = new Set(filteredRuns.map(v => v.run_start));
+            const result = data.filter(v => validRunStarts.has(v.run_start));
             expect(result).toHaveLength(2);
             expect(result[0].name).toBe('suite1');
             expect(result[1].name).toBe('suite2');
@@ -168,8 +220,8 @@ describe('filter.js pure logic', () => {
             const data = [
                 { run_start: '2025-01-15 09:00:00', name: 'suite1' },
             ];
-            const validRunStarts = filteredRuns.map(v => v.run_start);
-            const result = data.filter(v => validRunStarts.includes(v.run_start));
+            const validRunStarts = new Set(filteredRuns.map(v => v.run_start));
+            const result = data.filter(v => validRunStarts.has(v.run_start));
             expect(result).toHaveLength(0);
         });
     });
@@ -265,5 +317,138 @@ describe('filter.js pure logic', () => {
             expect(result[0].name).toBe('test1');
             expect(result[0].status).toBe('PASS');
         });
+    });
+});
+
+// Reimplementation of the per-project slicing of filter_amount from filter.js for direct
+// testing, the input handling around it reads the #amount input and needs the DOM
+function keep_last_amount_per_project(filteredRuns, selectedAmount) {
+    const runIndexesByProject = new Map();
+    filteredRuns.forEach((run, index) => {
+        for (const project of get_run_projects(run)) {
+            if (!runIndexesByProject.has(project)) runIndexesByProject.set(project, []);
+            runIndexesByProject.get(project).push(index);
+        }
+    });
+    const keptIndexes = new Set();
+    for (const indexes of runIndexesByProject.values()) {
+        for (const index of indexes.slice(- selectedAmount)) keptIndexes.add(index);
+    }
+    return filteredRuns.filter((_, index) => keptIndexes.has(index));
+}
+
+describe('filter_amount per project logic', () => {
+    const run = (name, tags = '') => ({ name, tags });
+
+    it('keeps the last X runs of every run name (issue #347)', () => {
+        const runs = [run('API'), run('UI'), run('UI'), run('UI')];
+        const result = keep_last_amount_per_project(runs, 1);
+        // the API project keeps its only run instead of being pushed out by the UI runs
+        expect(result).toEqual([runs[0], runs[3]]);
+    });
+
+    it('keeps the last X runs of every project tag (issue #347)', () => {
+        const runs = [run('UI', 'project_a'), run('UI', 'project_b'), run('UI', 'project_a')];
+        const result = keep_last_amount_per_project(runs, 1);
+        expect(result).toEqual([runs[1], runs[2]]);
+    });
+
+    it('keeps a run that is in the last X of at least one of its projects', () => {
+        const runs = [run('UI', 'project_a'), run('UI', 'project_a'), run('API', 'project_a')];
+        const result = keep_last_amount_per_project(runs, 1);
+        // runs[1] is the newest UI run, runs[2] the newest API and project_a run
+        expect(result).toEqual([runs[1], runs[2]]);
+    });
+
+    it('keeps the chronological order of the runs', () => {
+        const runs = [run('A'), run('B'), run('A'), run('B')];
+        expect(keep_last_amount_per_project(runs, 2)).toEqual(runs);
+    });
+
+    it('returns everything when the amount is higher than every project', () => {
+        const runs = [run('A'), run('B'), run('A')];
+        expect(keep_last_amount_per_project(runs, 10)).toEqual(runs);
+    });
+
+    it('returns an empty array for an empty run list', () => {
+        expect(keep_last_amount_per_project([], 5)).toEqual([]);
+    });
+});
+
+// The setting key is built from the page name, so settings.js, the ids in dashboard.html and the
+// lookup here have to stay in sync. These import the real filter.js so a rename fails the test.
+describe('filter.js hidden custom filters per page', () => {
+
+    it('knows the same four pages as the menu settings', () => {
+        expect([...dashboardPages].sort()).toEqual(Object.keys(settings.menu).sort());
+    });
+
+    it('has an empty hidden custom filters default for every page', () => {
+        dashboardPages.forEach(page => {
+            const key = `hiddenCustomFilters${page.charAt(0).toUpperCase() + page.slice(1)}`;
+            expect(settings.show[key]).toEqual([]);
+        });
+    });
+
+    describe('get_active_page', () => {
+
+        it('returns the page selected in the menu', () => {
+            dashboardPages.forEach(page => {
+                dashboardPages.forEach(other => { settings.menu[other] = other === page; });
+                expect(get_active_page()).toBe(page);
+            });
+        });
+
+        it('falls back to dashboard when no page is selected', () => {
+            dashboardPages.forEach(page => { settings.menu[page] = false; });
+            expect(get_active_page()).toBe('dashboard');
+        });
+    });
+
+    describe('get_hidden_custom_filters', () => {
+
+        it('returns the keys hidden for the requested page', () => {
+            settings.show.hiddenCustomFiltersOverview = ['Env'];
+            settings.show.hiddenCustomFiltersTables = ['Browser', 'Env'];
+            expect(get_hidden_custom_filters('overview')).toEqual(['Env']);
+            expect(get_hidden_custom_filters('tables')).toEqual(['Browser', 'Env']);
+            expect(get_hidden_custom_filters('compare')).toEqual([]);
+        });
+
+        it('defaults to the active page', () => {
+            settings.show.hiddenCustomFiltersCompare = ['Env'];
+            dashboardPages.forEach(page => { settings.menu[page] = page === 'compare'; });
+            expect(get_hidden_custom_filters()).toEqual(['Env']);
+        });
+
+        it('returns an empty list when the setting is missing', () => {
+            delete settings.show.hiddenCustomFiltersDashboard;
+            expect(get_hidden_custom_filters('dashboard')).toEqual([]);
+        });
+    });
+});
+
+describe('filter.js parse_custom_filters', () => {
+
+    it('parses the colon separated key=value pairs of --customfilters', () => {
+        expect(parse_custom_filters('Browser=chrome:Env=staging')).toEqual({ Browser: 'chrome', Env: 'staging' });
+    });
+
+    it('trims whitespace around keys and values', () => {
+        expect(parse_custom_filters(' Browser = chrome ')).toEqual({ Browser: 'chrome' });
+    });
+
+    it('keeps everything after the first equals sign as the value', () => {
+        expect(parse_custom_filters('Query=a=b')).toEqual({ Query: 'a=b' });
+    });
+
+    it('splits on colons first, so a colon ends the value', () => {
+        expect(parse_custom_filters('Url=http://host')).toEqual({ Url: 'http' });
+    });
+
+    it('skips parts without a key and returns an empty object for no value', () => {
+        expect(parse_custom_filters('=chrome:Env=prod')).toEqual({ Env: 'prod' });
+        expect(parse_custom_filters('')).toEqual({});
+        expect(parse_custom_filters(null)).toEqual({});
     });
 });

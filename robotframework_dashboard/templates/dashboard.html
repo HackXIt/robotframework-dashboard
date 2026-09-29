@@ -33,13 +33,17 @@
             <a class="nav-item nav-link fw-bold" id="menuCustomTitle" hidden></a>
             <a class="nav-link information px-1" id="navHamburger" role="button" hidden></a>
             <a class="nav-item nav-link" id="menuOverview">Overview</a>
+            <div class="nav-track" id="overviewNavTrack" hidden></div>
             <a class="nav-item nav-link active" id="menuDashboard">Dashboard</a>
-            <a class="nav-item nav-link" id="runStatisticsSectionNav"><i>Runs</i></a>
-            <a class="nav-item nav-link" id="suiteStatisticsSectionNav"><i>Suites</i></a>
-            <a class="nav-item nav-link" id="testStatisticsSectionNav"><i>Tests</i></a>
-            <a class="nav-item nav-link" id="keywordStatisticsSectionNav"><i>Keywords</i></a>
+            <div class="nav-track" id="dashboardNavTrack" hidden>
+                <a class="nav-item nav-link nav-track-item" id="runStatisticsSectionNav">Runs</a>
+                <a class="nav-item nav-link nav-track-item" id="suiteStatisticsSectionNav">Suites</a>
+                <a class="nav-item nav-link nav-track-item" id="testStatisticsSectionNav">Tests</a>
+                <a class="nav-item nav-link nav-track-item" id="keywordStatisticsSectionNav">Keywords</a>
+            </div>
             <a class="nav-item nav-link" id="menuCompare">Compare</a>
             <a class="nav-item nav-link" id="menuTables">Tables</a>
+            <div class="nav-track" id="tablesNavTrack" hidden></div>
             <a class="nav-item nav-link" id="openDashboard" href="/admin" hidden>Admin</a>
             <button class="btn btn-primary btn-sm ms-3 my-auto" id="refreshDashboard" hidden>
                 &#x21bb;&nbsp; Refresh Dashboard&nbsp;
@@ -56,8 +60,10 @@
             </li>
         </ul>
         <ul class="navbar-nav flex-row flex-nowrap ms-md-auto me-4" id="iconNavItems">
-            <li class="nav-item">
+            <li class="nav-item" style="position: relative;">
                 <a class="nav-link information" id="filters" data-bs-toggle="modal" data-bs-target="#filtersModal"></a>
+                <span id="filtersActiveIndicator" class="version-selected-dot"
+                    style="display: none; position: absolute; top: 4px; right: 4px;"></span>
             </li>
             <li class="nav-item">
                 <a class="nav-link information" id="customizeLayout"></a>
@@ -267,6 +273,14 @@
                                             id="switchSectionFiltersApplyTest" />
                                     </div>
                                 </div>
+                                <div class="filter-group flex-nowrap">
+                                    <label class="form-label mb-0 text-nowrap information info-label" for="testRerunView" id="testSectionRerunFilter">Reruns <span class="info-icon-small ms-1"></span></label>
+                                    <select class="form-select form-select-sm w-auto" id="testRerunView">
+                                        <option value="reruns">Mark Reruns</option>
+                                        <option value="final">Final Result</option>
+                                        <option value="first">First Attempt</option>
+                                    </select>
+                                </div>
                             </div>
                             <div class="col-auto ms-auto section-header-icons">
                                 <a class="add-stat-widget-header information" id="testAddStatWidgetHeader" data-section="test" hidden></a>
@@ -385,6 +399,14 @@
                                             id="switchSuitePathsCompareSection" />
                                     </div>
                                 </div>
+                                <div class="col-auto d-flex me-2">
+                                    <label class="form-label mb-0 me-2 mt-1 text-nowrap information info-label" for="compareRerunView" id="compareSectionRerunFilter">Reruns <span class="info-icon-small ms-1"></span></label>
+                                    <select class="form-select form-select-sm w-auto" id="compareRerunView">
+                                        <option value="reruns">Mark Reruns</option>
+                                        <option value="final">Final Result</option>
+                                        <option value="first">First Attempt</option>
+                                    </select>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -474,6 +496,8 @@
                                 <span class="d-flex align-items-center information info-label" id="filterRunsInformation">
                                     Runs
                                     <span class="info-icon-small ms-1"></span>
+                                    <span id="filterRunSelectedIndicator" class="version-selected-dot ms-2 mt-1"
+                                        style="display: none;"></span>
                                 </span>
                                 <div class="d-flex align-items-center">
                                     <select class="form-select form-select-sm" id="runs" style="width: 200px;"></select>
@@ -524,61 +548,81 @@
                                         </div>
                                         <div id="projectVersionCheckBoxes" class="filterCheckBoxes mt-2"
                                             style="max-height: 50vh; overflow-y: auto;">
-                                            <input id="projectVersionCheckBoxesFilter"
-                                                class="form-control form-control-sm" type="text"
-                                                placeholder="Filter...">
+                                            <div class="filter-search-wrapper">
+                                                <input id="projectVersionCheckBoxesFilter"
+                                                    class="form-control form-control-sm" type="text"
+                                                    placeholder="Type to select...">
+                                                <button type="button" class="filter-search-clear"
+                                                    id="projectVersionCheckBoxesFilterClear"
+                                                    aria-label="Clear search" title="Clear search (keeps selection)"
+                                                    hidden>&times;</button>
+                                            </div>
                                             <ul class="list-group" id="projectVersionList">
                                             </ul>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            <div class="list-group-item d-flex justify-content-between align-items-center">
-                                <input class="form-check-input filter-profile-check me-2" type="checkbox"
-                                    id="profileCheckFromDate" style="display: none;" />
-                                <span class="d-flex align-items-center information info-label" id="filterFromDateInformation">
-                                    From Date
-                                    <span class="info-icon-small ms-1"></span>
-                                </span>
-                                <div class="d-flex align-items-center">
-                                    <input class="form-control form-control-sm" id="fromDate" type="date"
-                                        style="width: 200px;" />
+                            <div class="list-group-item" id="dateHistogramFilter">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="d-flex align-items-center information info-label"
+                                        id="filterDateHistogramInformation">
+                                        Runs over Time
+                                        <span class="info-icon-small ms-1"></span>
+                                    </span>
+                                    <div class="d-flex align-items-center">
+                                        <span class="date-histogram-bucket me-2" id="dateHistogramBucket"></span>
+                                        <button type="button" class="btn btn-outline-light btn-sm text-nowrap"
+                                            id="dateHistogramReset">Reset Range</button>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="list-group-item d-flex justify-content-between align-items-center">
-                                <input class="form-check-input filter-profile-check me-2" type="checkbox"
-                                    id="profileCheckFromTime" style="display: none;" />
-                                <span class="d-flex align-items-center information info-label" id="filterFromTimeInformation">
-                                    From Time
-                                    <span class="info-icon-small ms-1"></span>
-                                </span>
-                                <div class="d-flex align-items-center">
-                                    <input class="form-control form-control-sm" id="fromTime" type="time"
-                                        style="width: 200px;" />
+                                <div class="date-histogram-wrapper" id="dateHistogramWrapper">
+                                    <canvas id="dateHistogramGraph"></canvas>
+                                    <div class="date-histogram-selection" id="dateHistogramSelection" hidden></div>
+                                    <div class="date-histogram-tooltip" id="dateHistogramTooltip" hidden></div>
                                 </div>
+                                <div class="date-histogram-empty" id="dateHistogramEmpty" hidden></div>
                             </div>
-                            <div class="list-group-item d-flex justify-content-between align-items-center">
-                                <input class="form-check-input filter-profile-check me-2" type="checkbox"
-                                    id="profileCheckToDate" style="display: none;" />
-                                <span class="d-flex align-items-center information info-label" id="filterToDateInformation">
-                                    To Date
-                                    <span class="info-icon-small ms-1"></span>
-                                </span>
-                                <div class="d-flex align-items-center">
-                                    <input class="form-control form-control-sm" id="toDate" type="date"
-                                        style="width: 200px;" />
-                                </div>
-                            </div>
-                            <div class="list-group-item d-flex justify-content-between align-items-center">
-                                <input class="form-check-input filter-profile-check me-2" type="checkbox"
-                                    id="profileCheckToTime" style="display: none;" />
-                                <span class="d-flex align-items-center information info-label" id="filterToTimeInformation">
-                                    To Time
-                                    <span class="info-icon-small ms-1"></span>
-                                </span>
-                                <div class="d-flex align-items-center">
-                                    <input class="form-control form-control-sm" id="toTime" type="time"
-                                        style="width: 200px;" />
+                            <div class="list-group-item" id="dateRangeFilter">
+                                <div class="d-flex flex-wrap align-items-center date-range-row">
+                                    <div class="d-flex align-items-center date-range-field">
+                                        <input class="form-check-input filter-profile-check me-2" type="checkbox"
+                                            id="profileCheckFromDate" style="display: none;" />
+                                        <span class="date-range-label">From</span>
+                                        <input class="form-control form-control-sm date-range-input" id="fromDate"
+                                            type="date" />
+                                        <span class="information info-label ms-1" id="filterFromDateInformation">
+                                            <span class="info-icon-small"></span>
+                                        </span>
+                                    </div>
+                                    <div class="d-flex align-items-center date-range-field">
+                                        <input class="form-check-input filter-profile-check me-2" type="checkbox"
+                                            id="profileCheckFromTime" style="display: none;" />
+                                        <input class="form-control form-control-sm date-range-input" id="fromTime"
+                                            type="time" />
+                                        <span class="information info-label ms-1" id="filterFromTimeInformation">
+                                            <span class="info-icon-small"></span>
+                                        </span>
+                                    </div>
+                                    <div class="d-flex align-items-center date-range-field">
+                                        <input class="form-check-input filter-profile-check me-2" type="checkbox"
+                                            id="profileCheckToDate" style="display: none;" />
+                                        <span class="date-range-label">To</span>
+                                        <input class="form-control form-control-sm date-range-input" id="toDate"
+                                            type="date" />
+                                        <span class="information info-label ms-1" id="filterToDateInformation">
+                                            <span class="info-icon-small"></span>
+                                        </span>
+                                    </div>
+                                    <div class="d-flex align-items-center date-range-field">
+                                        <input class="form-check-input filter-profile-check me-2" type="checkbox"
+                                            id="profileCheckToTime" style="display: none;" />
+                                        <input class="form-control form-control-sm date-range-input" id="toTime"
+                                            type="time" />
+                                        <span class="information info-label ms-1" id="filterToTimeInformation">
+                                            <span class="info-icon-small"></span>
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                             <div class="list-group-item d-flex justify-content-between align-items-center"
@@ -599,7 +643,7 @@
                                 <input class="form-check-input filter-profile-check me-2" type="checkbox"
                                     id="profileCheckAmount" checked style="display: none;" />
                                 <span class="d-flex align-items-center information info-label" id="filterAmountInformation">
-                                    Amount
+                                    Amount per project
                                     <span class="info-icon-small ms-1"></span>
                                 </span>
                                 <div class="d-flex align-items-center">
@@ -688,6 +732,11 @@
                                 <button class="nav-link" id="overview-tab" data-bs-toggle="tab"
                                     data-bs-target="#overview-settings" type="button" role="tab"
                                     aria-controls="overview-settings" aria-selected="false">Overview</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" id="filters-settings-tab" data-bs-toggle="tab"
+                                    data-bs-target="#filters-settings" type="button" role="tab"
+                                    aria-controls="filters-settings" aria-selected="false">Filters</button>
                             </li>
                             <li class="nav-item" role="presentation">
                                 <button class="nav-link" id="theme-tab" data-bs-toggle="tab" data-bs-target="#theme"
@@ -821,6 +870,20 @@
                                             </select>
                                         </div>
                                     </div>
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span class="information info-label" id="settingFilterCounts">Display Run Counts in Filter Options <span class="info-icon-small ms-1"></span></span>
+                                        <div class="form-check form-switch mb-0">
+                                            <input class="form-check-input" type="checkbox" role="switch"
+                                                id="toggleFilterCounts">
+                                        </div>
+                                    </div>
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span class="information info-label" id="settingFilterAvailability">Grey Out Filter Options Without Runs <span class="info-icon-small ms-1"></span></span>
+                                        <div class="form-check form-switch mb-0">
+                                            <input class="form-check-input" type="checkbox" role="switch"
+                                                id="toggleFilterAvailability">
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             <div class="tab-pane fade" id="overview-settings" role="tabpanel"
@@ -863,24 +926,90 @@
                                         </div>
                                     </div>
                                     <div class="list-group-item d-flex justify-content-between align-items-center">
-                                        <span class="information info-label" id="settingPercentageFilters">Display Percentage Filters <span class="info-icon-small ms-1"></span></span>
-                                        <div class="form-check form-switch mb-0">
-                                            <input class="form-check-input" type="checkbox" role="switch"
-                                                id="switchPercentageFilters" />
-                                        </div>
-                                    </div>
-                                    <div class="list-group-item d-flex justify-content-between align-items-center">
-                                        <span class="information info-label" id="settingVersionFilters">Display Version Filters <span class="info-icon-small ms-1"></span></span>
-                                        <div class="form-check form-switch mb-0">
-                                            <input class="form-check-input" type="checkbox" role="switch"
-                                                id="switchVersionFilters" />
-                                        </div>
+                                        <span class="information info-label" id="settingOverviewDurationPercentage">Duration comparison percentage <span class="info-icon-small ms-1"></span></span>
+                                        <select class="form-select form-select-sm" id="overviewDurationPercentage" style="width: auto;">
+                                            <option value="10">10%</option>
+                                            <option value="20">20%</option>
+                                            <option value="30">30%</option>
+                                            <option value="40">40%</option>
+                                            <option value="50">50%</option>
+                                            <option value="60">60%</option>
+                                            <option value="70">70%</option>
+                                            <option value="80">80%</option>
+                                            <option value="90">90%</option>
+                                            <option value="100">100%</option>
+                                        </select>
                                     </div>
                                     <div class="list-group-item d-flex justify-content-between align-items-center">
                                         <span class="information info-label" id="settingSortFilters">Display Sort Filters <span class="info-icon-small ms-1"></span></span>
                                         <div class="form-check form-switch mb-0">
                                             <input class="form-check-input" type="checkbox" role="switch"
                                                 id="switchSortFilters" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="tab-pane fade" id="filters-settings" role="tabpanel"
+                                aria-labelledby="filters-settings-tab">
+                                <p><i>Hide custom filter attributes per page. A hidden attribute has no filter in the
+                                        Filters dialog on that page and is not applied there, and it is left off the
+                                        Overview run cards.</i></p>
+                                <div class="list-group">
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span class="information info-label" id="settingHiddenCustomFiltersOverview">Hide Custom Filters on Overview <span class="info-icon-small ms-1"></span></span>
+                                        <div style="width: 200px;">
+                                            <div class="selectBox" id="selectHiddenCustomFiltersOverview">
+                                                <select class="form-select form-select-sm">
+                                                    <option>Select Attributes</option>
+                                                </select>
+                                                <div class="overSelect"></div>
+                                            </div>
+                                            <div id="hiddenCustomFiltersOverviewCheckBoxes" class="filterCheckBoxes mt-2" style="max-height: 50vh; overflow-y: auto; display: none;">
+                                                <ul class="list-group" id="hiddenCustomFiltersOverviewList"></ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span class="information info-label" id="settingHiddenCustomFiltersDashboard">Hide Custom Filters on Dashboard <span class="info-icon-small ms-1"></span></span>
+                                        <div style="width: 200px;">
+                                            <div class="selectBox" id="selectHiddenCustomFiltersDashboard">
+                                                <select class="form-select form-select-sm">
+                                                    <option>Select Attributes</option>
+                                                </select>
+                                                <div class="overSelect"></div>
+                                            </div>
+                                            <div id="hiddenCustomFiltersDashboardCheckBoxes" class="filterCheckBoxes mt-2" style="max-height: 50vh; overflow-y: auto; display: none;">
+                                                <ul class="list-group" id="hiddenCustomFiltersDashboardList"></ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span class="information info-label" id="settingHiddenCustomFiltersCompare">Hide Custom Filters on Compare <span class="info-icon-small ms-1"></span></span>
+                                        <div style="width: 200px;">
+                                            <div class="selectBox" id="selectHiddenCustomFiltersCompare">
+                                                <select class="form-select form-select-sm">
+                                                    <option>Select Attributes</option>
+                                                </select>
+                                                <div class="overSelect"></div>
+                                            </div>
+                                            <div id="hiddenCustomFiltersCompareCheckBoxes" class="filterCheckBoxes mt-2" style="max-height: 50vh; overflow-y: auto; display: none;">
+                                                <ul class="list-group" id="hiddenCustomFiltersCompareList"></ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        <span class="information info-label" id="settingHiddenCustomFiltersTables">Hide Custom Filters on Tables <span class="info-icon-small ms-1"></span></span>
+                                        <div style="width: 200px;">
+                                            <div class="selectBox" id="selectHiddenCustomFiltersTables">
+                                                <select class="form-select form-select-sm">
+                                                    <option>Select Attributes</option>
+                                                </select>
+                                                <div class="overSelect"></div>
+                                            </div>
+                                            <div id="hiddenCustomFiltersTablesCheckBoxes" class="filterCheckBoxes mt-2" style="max-height: 50vh; overflow-y: auto; display: none;">
+                                                <ul class="list-group" id="hiddenCustomFiltersTablesList"></ul>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

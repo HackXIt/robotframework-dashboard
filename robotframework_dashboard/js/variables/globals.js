@@ -1,6 +1,5 @@
 // UI defaults
 const CARDS_PER_ROW = 3;
-const DEFAULT_DURATION_PERCENTAGE = 20;
 
 // populated by prepare_overview()
 const projects_by_tag = {};
@@ -15,6 +14,7 @@ var filteredRuns;
 var filteredSuites;
 var filteredTests;
 var filteredKeywords;
+var filteredExceptions;
 
 // vars to keep track of grids
 var gridUnified = null
@@ -28,6 +28,10 @@ var gridEditMode = false; // used to check how the graphs should be shown when r
 // global vars for switching between overview and dashboard
 var selectedRunSetting = '';
 var selectedTagSetting = '';
+// holds the project (and version) of the filter that was applied by clicking an overview
+// project card, so returning to the overview page can drop that filter again and show all
+// projects instead of the single clicked one (issue #348)
+let overviewProjectNavFilter = { project: '', version: '' };
 
 // some global vars for various functionalities
 var showingRunTags = false; // used to keep track if the runtags popup is showing and determine if it should be closed when clicked outside
@@ -140,6 +144,11 @@ let overviewNavStore = {
     resizeHandler: null,
 };
 
+let tablesNavStore = {
+    scrollHandler: null,
+    resizeHandler: null,
+};
+
 var defaultFaviconHref = (() => {
     const link = document.querySelector("link[rel~='icon']");
     return link ? link.getAttribute('href') : null;
@@ -147,7 +156,6 @@ var defaultFaviconHref = (() => {
 
 export {
     CARDS_PER_ROW,
-    DEFAULT_DURATION_PERCENTAGE,
     projects_by_tag,
     projects_by_name,
     latestRunByProjectTag,
@@ -158,6 +166,7 @@ export {
     filteredSuites,
     filteredTests,
     filteredKeywords,
+    filteredExceptions,
     gridUnified,
     gridRun,
     gridSuite,
@@ -167,6 +176,7 @@ export {
     gridEditMode,
     selectedRunSetting,
     selectedTagSetting,
+    overviewProjectNavFilter,
     showingRunTags,
     showingProjectVersionDialogue,
     inFullscreen,
@@ -178,7 +188,9 @@ export {
     ignoreSkipsRecent,
     onlyFailedFolders,
     overviewNavStore,
+    tablesNavStore,
     lastMergeResult,
     filterRows,
-    defaultFaviconHref
+    defaultFaviconHref,
+    escape_html_for_merge
 };

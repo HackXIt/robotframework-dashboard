@@ -54,13 +54,15 @@ For all available CLI options see the [Basic CLI docs](https://marketsquare.gith
 - 📄 **Dashboard Pages** - Overview, Dashboard, and Compare pages for multi-level insights.  
 - 🎛️ **Customizable Layouts** - Drag-and-drop sections with adjustable size and order.  
 - 📊 **Graph Customization** - Toggle legends, axis titles, labels, and control animations.  
-- 🔎 **Global Filters** - Filter runs by name, tags, date, metadata, or quantity.  
+- 🔎 **Global Filters** - Filter runs by name, tags, date, metadata, or quantity (applied per project). Drag across the runs-over-time histogram to zoom into a period. Every filter option shows how many runs it still matches, and options that match none are greyed out.  
 - ⚖️ **Comparison Mode** - Compare up to 4 runs side by side with visual statistics.  
 - 🔗 **Automatic Log Linking** - Open Robot Framework logs directly from the dashboard.  
+- 🔁 **Rerun History** - Merged `--rerunfailed` outputs keep the status of every attempt per test.  
 - 🛠️ **Custom Database Classes** - Extend or replace the database processor for custom backends.  
 - 🖥️ **Server Mode** - Host your dashboard for multi-user access and automatic updates.  
 - 🎧 **Listener Integration** - Automatically updates dashboard after every test run.  
 - 📝 **Message Config Support** - Group similar test failures using regex-based patterns.  
+- 🚨 **Exception Tracking** - Track exception messages caught by TRY/EXCEPT blocks across runs, with a dedicated graph and table.  
 - ⚙️ **Configurable Defaults** - Preload dashboard settings via JSON for consistent appearance.  
 
 …and many more advanced features to help you visualize, analyze, and manage your Robot Framework test results with ease!
@@ -83,6 +85,7 @@ For detailed usage instructions, advanced examples, and full documentation, visi
 - 🗄️ [**Custom Database Class**](https://marketsquare.github.io/robotframework-dashboard/custom-database-class.html) - Extend or replace the default database backend to suit your storage needs, including SQLite, MySQL, or custom implementations.
 - 🔔 [**Listener Integration**](https://marketsquare.github.io/robotframework-dashboard/listener-integration.html) - Use a listener to automatically push test results to the dashboard for every executed run, integrating seamlessly into CI/CD pipelines.
 - 📂 [**Log Linking**](https://marketsquare.github.io/robotframework-dashboard/log-linking.html) - Enable clickable log navigation from dashboard graphs, covering file naming conventions, local and server usage, and remote log uploads.
+- 🔁 [**Reruns**](https://marketsquare.github.io/robotframework-dashboard/reruns.html) - Feed merged `--rerunfailed` outputs to the dashboard and see the attempt history of every re-executed test.
 - 📈 [**Performance**](https://marketsquare.github.io/robotframework-dashboard/performance.html) - Performance results across different workload sizes, guidance on scaling to hundreds of runs, and tips for large result sets.
 
 
@@ -94,7 +97,7 @@ robotframework-dashboard is designed to stay fast even as your result set grows.
 - **Dashboard generation** is nearly always **under 1 second** regardless of scale — data is already aggregated in the database, so re-generating HTML after adding new runs is essentially free.
 - **Incremental processing** — output files already in the database are automatically skipped, so you can safely re-run against a folder of XMLs without re-processing old results.
 - **HTML size** stays modest (~500 KB–1 MB for typical workloads) thanks to zlib compression of the embedded data.
-- **Dashboard rendering** (Chart.js in the browser) depends on how many runs are displayed. The default limit is **20 runs** (near-instant). Raising it to **50 runs** takes a few seconds as Chart.js renders all graphs. At **100+ runs**, initial rendering can approach **~10 seconds or more!**. This is also affected by your suite and test size — selecting **"All Suites"** or **"All Tests"** in their respective sections amplifies render time significantly, since each unique name becomes a separate data series. Use the quantity filter to keep the displayed run count manageable.
+- **Dashboard rendering** (Chart.js in the browser) depends on how many runs are displayed. The default limit is **20 runs per project** (near-instant). Raising it to **50 runs** takes a few seconds as Chart.js renders all graphs. At **100+ runs**, initial rendering can approach **~10 seconds or more!**. This is also affected by your suite and test size — selecting **"All Suites"** or **"All Tests"** in their respective sections amplifies render time significantly, since each unique name becomes a separate data series. Use the quantity filter to keep the displayed run count manageable.
 
 For detailed results and scaling guidance, see the [Performance docs](https://marketsquare.github.io/robotframework-dashboard/performance.html).
 

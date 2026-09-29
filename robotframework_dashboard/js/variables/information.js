@@ -21,8 +21,6 @@ const informationMap = {
 - Average Pass Rate: mean pass rate across all runs
 See Settings > Overview for display options.`,
     "overviewLatestInformation": "Shows the latest run per project. Click a card to apply a project filter and open the dashboard.",
-    "overviewLatestPercentageInfo": "Duration color threshold: green if the run is at least X% faster than average, red if X% slower.",
-    "overviewLatestVersionsInfo": "Filter overview cards by project version. 'All' shows all versions.",
     "overviewLatestSortInfo": "Sort project cards by: Most Recent, Oldest, Most Failed, Most Skipped, or Most Passed.",
     "unifiedStatisticsInformation": `Unified view combining data from all projects into one dashboard.
 - Use the top filters to focus on specific projects, versions, or timeframes.
@@ -38,6 +36,8 @@ See Settings > Overview for display options.`,
     "testSectionPathsFilter": "Show full suite paths instead of just suite names — useful when duplicate names exist across different folders.",
     "testSectionTestFilter": "Zoom in on a specific test. Applies to Statistics, Duration and Duration Deviation graphs.",
     "testSectionTagFilter": "Filter tests by tag. Applies to Statistics, Duration and Duration Deviation graphs.",
+    "compareSectionRerunFilter": "How re-executed tests (robot --rerunfailed + rebot --merge) are shown in the Tests graph: the final result, the final result with re-executed tests marked by a blue border, or the status of their first attempt. Hover a marked test for its attempt history.",
+    "testSectionRerunFilter": "How tests that were re-executed (robot --rerunfailed + rebot --merge) are shown in the Statistics graph: the final result, the final result with re-executed tests marked by a blue border, or the status of their first attempt. Hover a marked test for its attempt history.",
     "testSectionFiltersApplyFilter": "When on, the test filters apply to the Most Failed, Most Flaky, Most Time Consuming, and Error Messages graphs. When off, those graphs always show results across all tests in the current data.",
     "keywordStatisticsInformation": `Keyword section: statistics and duration charts per keyword.`,
     "keywordSectionKeywordFilter": "Zoom in on a specific keyword. Applies to Statistics, Times Run, and all Duration graphs.",
@@ -134,6 +134,8 @@ It helps identify tests with inconsistent execution times, which might be flaky 
     "keywordMostTimeConsumingGraphTimeline": "Timeline: the slowest keyword per run over time (Top 10; Top 50 in fullscreen). When 'Only Last Run' is on, shows the latest run's slowest keywords.",
     "keywordMostUsedGraphBar": "Bar: keywords ranked by total usage frequency across all runs (Top 10; Top 50 in fullscreen). When 'Only Last Run' is on, shows the most-used keywords in the latest run.",
     "keywordMostUsedGraphTimeline": "Timeline: keyword usage trends across runs (Top 10; Top 50 in fullscreen). When 'Only Last Run' is on, shows the latest run's most-used keywords.",
+    "keywordExceptionsGraphBar": "Bar: Displays exception messages caught by TRY/EXCEPT blocks, ranked by how many times each exception occurred across all runs. The regular view shows the Top 10; fullscreen mode expands to the Top 50.",
+    "keywordExceptionsGraphTimeline": "Timeline: Displays exception messages caught by TRY/EXCEPT blocks over time. Each row is a distinct exception message; each cell represents a run where that exception occurred, with the count shown.",
     "filterProfileInformation": `Filter Profiles let you save and reapply named filter combinations.
 - Add Profile: name a new profile and choose which filters to include.
 - Save Profile: saves the current filter values under that name.
@@ -141,21 +143,43 @@ It helps identify tests with inconsistent execution times, which might be flaky 
 - A dot means the active profile's filters have been modified since it was applied.
 - Update Profile: overwrites the saved profile with the current filter values.
 - Merge Profiles: combine two profiles using the widest coverage for each filter.`,
-    "filterRunsInformation": "Filter by project name. 'All' includes every project.",
+    "filterRunsInformation": `Filter by project name. 'All' includes every project.
+- The number behind an option is how many runs remain if you select it (the other filters stay as they are).
+- Greyed out options match no runs, but can still be selected.`,
     "filterRunTagsInformation": `Filter by run tags. 'All' disables the filter.
 - AND mode (default): run must have all selected tags.
 - OR mode: run needs at least one selected tag.
 - NOT mode: run must not have any selected tag.
-- A dot indicates the filter is active.`,
+- A dot indicates the filter is active.
+- The number behind an option is how many runs remain if you select it (the other filters stay as they are).
+- Greyed out options match no runs, but can still be selected.`,
     "filterVersionsInformation": `Filter by project version. 'All' disables the filter.
 - 'None' covers runs without a version label.
-- A dot indicates the filter is active.`,
+- Typing in the search box selects every matching version (e.g. "1." selects all 1.x).
+- The X in the search box clears it while keeping the current selection.
+- A dot indicates the filter is active.
+- The number behind an option is how many runs remain if you select it (the other filters stay as they are).
+- Greyed out options match no runs, but can still be selected.`,
+    "filterDateHistogramInformation": `How many runs started in each time bucket, split by run status, for the date range below.
+- Drag across the bars to select a range: the from/to date and time are filled in and the chart zooms into the selection, so dragging again zooms in further.
+- Clicking a single bar selects that bucket.
+- A selection always covers whole bars, and the text next to the chart says how much time one bar is.
+- Hovering a bar shows its time range and one block per run with the tests that passed, failed and were skipped, the same way the run graphs do.
+- 'Reset Range' (or widening the from/to values by hand) zooms back out to all runs.
+- Every other filter shapes the bars, the date range itself does not: it is the part of the timeline you are looking at, so widening it brings the runs outside it back.
+- The amount filter is not applied to the bars.`,
     "filterFromDateInformation": "Show only runs that started on or after this date.",
     "filterFromTimeInformation": "Show only runs that started at or after this time (combined with From Date).",
     "filterToDateInformation": "Show only runs that started on or before this date.",
     "filterToTimeInformation": "Show only runs that started at or before this time (combined with To Date).",
-    "filterMetadataInformation": "Filter by a metadata value attached to the run. Only shown when runs have metadata.",
-    "filterAmountInformation": "Limit to the most recent X runs after all other filters are applied. 'All Runs' sets this to the total matching count.",
+    "filterMetadataInformation": `Filter by a metadata value attached to the run. Only shown when runs have metadata.
+- The number behind an option is how many runs remain if you select it (the other filters stay as they are).
+- Greyed out options match no runs, but can still be selected.`,
+    "filterAmountInformation": `Limit to the most recent X runs per project, after all other filters are applied.
+- A project is a run name and every 'project_' run tag, the same grouping the overview page uses.
+- The limit is not applied to the combined run list, so a project that runs less often is never pushed out of the overview (and the dashboard) by a project that runs more often.
+- A run is kept when it is one of the last X runs of at least one of its projects, which means the total number of shown runs can be higher than X.
+- 'All Runs' sets this to the total matching count, which shows every run of every project.`,
     "filterSuitePathsInformation": `Filter runs by suite path. Only runs that contain at least one suite matching the selected path (or any of its sub-paths) are shown.
 - Navigate into sub-folders by clicking a child button.
 - Use the breadcrumb links to jump back to a parent level.
@@ -181,14 +205,19 @@ Tip: avoid using Status and Only Changes together — the result will be empty.`
     "settingConvertTimezone": "Convert stored run_start timestamps to your browser's local timezone. Only applies to runs that have a stored timezone offset.",
     "settingSuiteStatsDefault": "Default suite shown in the Suite Statistics tab when the dashboard opens.",
     "settingTestStatsDefault": "Default suite shown in the Test Statistics tab when the dashboard opens.",
+    "settingFilterCounts": "Show behind every filter option how many runs remain if that option is the selection of its filter. The count is calculated with all other filters applied, and ignores the amount filter.",
+    "settingFilterAvailability": "Grey out filter options that match no runs with the other filters as they are. The options stay visible and selectable.",
     "settingLatestRuns": "Show the Latest Runs bar with the most recent run per project, color-coded by duration.",
     "settingTotalStats": "Show the Total Stats bar with aggregate pass/fail/skip counts and average pass rates per project.",
     "settingProjectsByName": "Group and display projects on the Overview by their Robot Framework run name.",
     "settingProjectsByTag": "Group and display projects on the Overview by custom project_ tags. See the docs for project tagging.",
     "settingPrefixes": "Show or hide the 'project_' prefix on tag-based project names on the Overview.",
-    "settingPercentageFilters": "Show the duration percentage threshold filter used to color-code run durations on the Overview.",
-    "settingVersionFilters": "Show the version filter for per-project version selection on the Overview.",
+    "settingOverviewDurationPercentage": "Threshold for duration color comparison on all project bars. A run is green if at least X% faster than average, red if X% slower.",
     "settingSortFilters": "Show the sort controls for ordering Overview project bars.",
+    "settingHiddenCustomFiltersOverview": "Custom filter attributes to hide on the Overview page. A hidden attribute gets no filter in the Filters dialog there, is not applied there, and is left off the run cards. Only lists attributes found in the run data.",
+    "settingHiddenCustomFiltersDashboard": "Custom filter attributes to hide on the Dashboard page. A hidden attribute gets no filter in the Filters dialog there and is not applied there. Only lists attributes found in the run data.",
+    "settingHiddenCustomFiltersCompare": "Custom filter attributes to hide on the Compare page. A hidden attribute gets no filter in the Filters dialog there and is not applied there. Only lists attributes found in the run data.",
+    "settingHiddenCustomFiltersTables": "Custom filter attributes to hide on the Tables page. A hidden attribute gets no filter in the Filters dialog there and is not applied there. Only lists attributes found in the run data.",
     "settingBackgroundColor": "Main page background color for the current theme.",
     "settingCardColor": "Background color for graph cards and content panels.",
     "settingHighlightColor": "Accent color used for hover states and interactive elements.",
@@ -212,6 +241,7 @@ const graphKeys = [
     "testStatSkipped", "testStatPassRate", "testStatTotalTime", "testStatAvgTime",
     "keywordStatistics", "keywordTimesRun", "keywordTotalDuration", "keywordAverageDuration",
     "keywordMinDuration", "keywordMaxDuration", "keywordMostFailed", "keywordMostTimeConsuming", "keywordMostUsed",
+    "keywordExceptions",
     "keywordStatExecutions", "keywordStatUnique", "keywordStatPassed", "keywordStatFailed",
     "keywordStatTotalTime", "keywordStatAvgTime",
     "compareStatistics", "compareSuiteDuration", "compareTests",
@@ -225,7 +255,7 @@ graphKeys.forEach(key => {
     informationMap[`${key}Hidden`] = "Show Graph";
 });
 
-["runTable", "suiteTable", "testTable", "keywordTable"].forEach(key => {
+["runTable", "suiteTable", "testTable", "keywordTable", "exceptionTable"].forEach(key => {
     informationMap[`${key}MoveUp`] = "Move Up";
     informationMap[`${key}MoveDown`] = "Move Down";
     informationMap[`${key}Shown`] = "Hide Table";

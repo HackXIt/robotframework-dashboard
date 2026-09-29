@@ -54,6 +54,22 @@ All tests run automatically in GitHub Actions. They are triggered through the `.
 Results can be found at the `PR > checks > Upload robot logs`.
 The check will have a failed status if any tests has failed.
 
+### Test Data
+The `output.xml` / `log.html` files in `tests/robot/resources/outputs/` (also used by the python unit tests and the
+example dashboard) are **generated** by `tests/robot/resources/generator/generate.py` from two simulated projects
+(`WebshopUI`, `WebshopAPI`) with fake browser/API libraries. Do not edit the fixtures by hand; change the generator
+(`libraries/profiles.py` decides which tests fail, are flaky, skip, throw exceptions or get slower; `RERUNS` in
+`generate.py` decides which runs get their failed tests re-executed and merged with `rebot --merge`) and run
+
+```
+python tests/robot/resources/generator/generate.py
+```
+
+then refresh the reference screenshots, `cli_output` and `database_output` files by running the robot tests in Docker.
+The generator suites are not part of the test pipeline. See `tests/robot/resources/generator/README.md`.
+
+The example dashboard in `example/` is built from the same fixtures with `python scripts/example.py` (or `scripts\example.bat` on Windows). Add `--test` to build `robot_dashboard.html` in the repo root without updating `example/`, handy for eyeballing a change.
+
 ## Running Tests Locally - in a Docker Container
 Run the tests locally on your PC before pushing and waiting for the results from the GitHub actions is always a good idea. But this requires to install the required components in your native PC. In some cases this will not work as expected bacause of the differemt versions used. E.g.  screenshots taken during the tests may differ, so that the tests might fail.
 
@@ -87,6 +103,15 @@ bash scripts/docker/run-in-robot-container.sh bash scripts/robot-tests.sh
 # Windows
 C:> scripts\docker\run-in-robot-container.bat bash scripts/robot-tests.sh
 ```
+
+Failed tests are rerun once and the two attempts merged (`rebot --merge`) so that a transient browser crash or timing
+race does not fail the pipeline; a test that is still red in `results/log.html` failed twice.
+
+The GitHub action runs the same image, prebuilt and published to GHCR by `.github/workflows/test-image.yml`
+(rebuilt when `requirements-test.txt` or `scripts/docker/test-dashboard-robot.dockerfile` change on `main`).
+
+Browser tests never sleep before a screenshot: `Wait For Dashboard Idle` polls `window.dashboard_is_idle()`, a hook
+the tests inject into the page (`tests/robot/resources/scripts/dashboard_idle.js`) that is only true when no spinner, overlay, modal, fade or chart animation is in progress.
 
 To run a individual tests out of a suite:
 ```bash
@@ -195,7 +220,19 @@ C:> scripts\docker\create-test-image.bat python --no-cache
 
 ## 📖 Docs
 
-The docs are hosted through the main branch. Only this branch will actually deploy the change you make. To locally test the documentation you can do the following:
+The docs site is versioned. `.github/workflows/deploy.yml` builds and deploys it on every push to `main`, on every `vX.Y.Z` tag push and on manual dispatch:
+
+| URL | Built from |
+|---|---|
+| `/robotframework-dashboard/` | the latest release tag |
+| `/robotframework-dashboard/dev/` | `main` (unreleased changes, `noindex`) |
+| `/robotframework-dashboard/vX.Y.Z/` | every release tag from `v1.3.0` on (`noindex`) |
+| `/robotframework-dashboard/vX.Y.Z/` | every PyPI release before `v1.3.0` (0.1.1 – 1.2.2): the README of that release as a single page (`noindex`) |
+| `/robotframework-dashboard/versions.json` | list of all versions, feeds the version switcher in the nav bar |
+
+So a docs change merged to `main` shows up under `/dev/` right away and reaches `/` with the next release tag. The version switcher and the "old version" banner read `versions.json` at runtime, so a new release appears in every version without rebuilding them; CI keeps the finished builds of released versions in an `actions/cache` (`.docs-dist-cache/`) and only rebuilds `/dev/` on a normal push, or everything once when `docs/.vitepress/`, the build scripts or `package-lock.json` change. Old tags are immutable: their markdown is built as-is, only the current `docs/.vitepress/` (config, theme, banner) and `scripts/docs/copy-static.mjs` are copied over each checkout by `scripts/docs/build-versioned-docs.mjs`. If an old tag breaks the build (e.g. a dead link), add a text replacement for that tag to the `PATCHES` table in that script. The releases before `v1.3.0` were never tagged; `scripts/docs/legacy-docs-versions.json` maps each of them to the commit that introduced its version string, and the build turns that commit's `README.md` into the page (images copied along, repo-relative links pointed at GitHub at that commit). This list is closed — nothing needs to be added to it for new releases. The demo videos under `docs/public/` are only shipped with the root build; every other version references them from there to stay well below the 1 GB GitHub Pages limit. Each version's example dashboard gets a small shim (`DOCS_STORAGE_NAMESPACE` in `scripts/docs/copy-static.mjs`) that prefixes its localStorage keys, so the settings saved by one version cannot break the dashboard of another.
+
+To locally test the documentation you can do the following:
 1. Install node.js
 2. Run below to install the vitepress plugin and all other dependencies
 ```
@@ -205,3 +242,13 @@ npm install
 ```
 npm run docs:dev
 ```
+4. To build the versioned site the way CI does (all tags, ~1 min) or only a few versions, and preview it under the same `/robotframework-dashboard/` prefix as GitHub Pages:
+```
+npm run docs:build:versions
+npm run docs:build:versions -- --only latest,dev,v1.3.0
+npm run docs:build:versions -- --only latest,legacy       # latest + all README-only releases
+npm run docs:build:versions -- --cache-dir .docs-dist-cache   # reuse finished builds between runs, like CI
+npm run docs:build:versions -- --only dev --no-example         # skip rebuilding the example dashboard
+npm run docs:preview:versions
+```
+The `dev` version rebuilds `example/robot_dashboard.html` from its own worktree first (`scripts/example.py`), so the example under `/dev/` shows what `main` does rather than what the last release did. Every released version keeps the example that was committed for it. The rebuild needs a python with the package dependencies installed; without one the build keeps the committed example and says so, and `--no-example` skips it on purpose. Neither writes into your checkout: the rebuild happens in the temporary worktree.

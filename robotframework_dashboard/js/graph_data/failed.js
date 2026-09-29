@@ -1,7 +1,7 @@
 import { settings, get_run_label } from "../variables/settings.js";
 import { inFullscreen, inFullscreenGraph } from "../variables/globals.js";
-import { convert_timeline_data } from "./helpers.js";
-import { failedConfig } from "../variables/chartconfig.js";
+import { convert_timeline_data, group_timeline_values, parse_test_attempts } from "./helpers.js";
+import { failedConfig, rerunBorderColor, rerunBorderWidth } from "../variables/chartconfig.js";
 import { strip_tz_suffix } from "../common.js";
 
 // function to prepare the data in the correct format for most failed graphs
@@ -93,15 +93,15 @@ function get_most_failed_data(dataType, graphType, filteredData, recent) {
         let datasets = [];
         let runAxis = 0;
         const pointMeta = {};
+        const groups = group_timeline_values(filteredData, labels, value => value.failed > 0 ? [getTestKey(value, dataType)] : []);
         for (const runStart of runStarts) {
             for (const label of labels) {
-                const foundValues = filteredData.filter(value =>
-                    getTestKey(value, dataType) === label &&
-                    value.run_start === runStart &&
-                    value.failed > 0
-                );
+                const foundValues = groups.get(label).get(runStart) ?? [];
                 if (foundValues.length > 0) {
                     const value = foundValues[0];
+                    // tests re-executed with robot --rerunfailed (rebot --merge history) get the rerun border
+                    const attempts = dataType === "test" && (settings.switch.testRerunView || "reruns") !== "final"
+                        ? parse_test_attempts(value) : [];
                     pointMeta[`${label}::${runAxis}`] = {
                         status: "FAIL",
                         elapsed_s: value.elapsed_s || 0,
@@ -109,11 +109,13 @@ function get_most_failed_data(dataType, graphType, filteredData, recent) {
                         passed: value.passed || 0,
                         failed: value.failed || 0,
                         skipped: value.skipped || 0,
+                        attempts,
                     };
                     datasets.push({
                         label: label,
                         data: [{ x: [runAxis, runAxis + 1], y: label }],
                         ...failedConfig,
+                        ...(attempts.length > 0 ? { borderColor: rerunBorderColor, borderWidth: rerunBorderWidth } : {}),
                     });
                     foundValues.forEach(v => runLabelsSet.add(get_run_label(v)));
                 }

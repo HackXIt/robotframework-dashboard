@@ -75,6 +75,7 @@ class DatabaseProcessor(AbstractDatabaseProcessor):
             # run: metadata was added in 1.0.0
             # keyword: owner was added in 1.2.0
             # run: project_version was added in 1.3.0
+            # test: attempts (rebot --merge rerun history) was added in 2.3.0
             run_table_length = get_runs_length()
             if run_table_length == 10:  # -> column alias not present
                 self.connection.cursor().execute(RUN_TABLE_UPDATE_ALIAS)
@@ -119,6 +120,10 @@ class DatabaseProcessor(AbstractDatabaseProcessor):
                 self.connection.cursor().execute(TEST_TABLE_UPDATE_ID)
                 self.connection.commit()
                 test_table_length = get_tests_length()
+            if test_table_length == 12:
+                self.connection.cursor().execute(TEST_TABLE_UPDATE_ATTEMPTS)
+                self.connection.commit()
+                test_table_length = get_tests_length()
 
             keyword_table_length = get_keywords_length()
             if keyword_table_length == 10:
@@ -129,11 +134,15 @@ class DatabaseProcessor(AbstractDatabaseProcessor):
                 self.connection.cursor().execute(KEYWORD_TABLE_UPDATE_OWNER)
                 self.connection.commit()
                 keyword_table_length = get_keywords_length()
+            # exceptions table: added later, safe to create if missing
+            self.connection.cursor().execute(CREATE_EXCEPTIONS)
+            self.connection.commit()
         else:
             self.connection.cursor().execute(CREATE_RUNS)
             self.connection.cursor().execute(CREATE_SUITES)
             self.connection.cursor().execute(CREATE_TESTS)
             self.connection.cursor().execute(CREATE_KEYWORDS)
+            self.connection.cursor().execute(CREATE_EXCEPTIONS)
             self.connection.commit()
 
     def close_database(self):
@@ -159,6 +168,7 @@ class DatabaseProcessor(AbstractDatabaseProcessor):
             self._insert_suites(output_data["suites"], run_alias, timezone)
             self._insert_tests(output_data["tests"], run_alias, timezone)
             self._insert_keywords(output_data["keywords"], run_alias, timezone)
+            self._insert_exceptions(output_data.get("exceptions", []), run_alias, timezone)
         except Exception as error:
             print(f"   ERROR: something went wrong with the database: {error}")
 
@@ -227,6 +237,18 @@ class DatabaseProcessor(AbstractDatabaseProcessor):
         self.connection.executemany(INSERT_INTO_KEYWORDS, full_keywords)
         self.connection.commit()
 
+    def _insert_exceptions(self, exceptions: list, run_alias: str, timezone: str = ""):
+        """Helper function to insert the exception data"""
+        full_exceptions = []
+        for exc in exceptions:
+            exc = list(exc)
+            if timezone:
+                exc[0] = f"{exc[0]}{timezone}"
+            exc.append(run_alias)
+            full_exceptions.append(tuple(exc))
+        self.connection.executemany(INSERT_INTO_EXCEPTIONS, full_exceptions)
+        self.connection.commit()
+
     @staticmethod
     def _get_local_timezone_offset():
         """Helper function to get the local machine's timezone offset as a string like +01:00"""
@@ -250,7 +272,7 @@ class DatabaseProcessor(AbstractDatabaseProcessor):
 
     def get_data(self):
         """This function gets all the data in the database"""
-        data, runs, suites, tests, keywords, aliases = {}, [], [], [], [], {}
+        data, runs, suites, tests, keywords, exceptions, aliases = {}, [], [], [], [], [], {}
         name_labels = {}
         local_tz = self._get_local_timezone_offset()
         alias_counter = 1
@@ -327,6 +349,8 @@ class DatabaseProcessor(AbstractDatabaseProcessor):
                 row["tags"] = ""
             if row["id"] == None:
                 row["id"] == ""
+            if row.get("attempts") == None:
+                row["attempts"] = ""
             # For older entries without timezone in run_start, append current local timezone
             if not self._has_timezone_offset(row["run_start"]):
                 row["run_start"] = f"{row['run_start']}{local_tz}"
@@ -349,6 +373,21 @@ class DatabaseProcessor(AbstractDatabaseProcessor):
                 name_prefix_lookup.get(row["run_start"][:19], ""))
             keywords.append(row)
         data["keywords"] = keywords
+        # Get exceptions from exceptions table
+        try:
+            exception_rows = self.connection.cursor().execute(SELECT_FROM_EXCEPTIONS).fetchall()
+            for exception_row in exception_rows:
+                row = self._dict_from_row(exception_row)
+                if not self._has_timezone_offset(row["run_start"]):
+                    row["run_start"] = f"{row['run_start']}{local_tz}"
+                row["run_alias"] = aliases.get(row["run_start"],
+                    alias_prefix_lookup.get(row["run_start"][:19], ""))
+                row["run_name"] = name_labels.get(row["run_start"],
+                    name_prefix_lookup.get(row["run_start"][:19], ""))
+                exceptions.append(row)
+        except Exception:
+            pass  # table may not exist in older/custom databases
+        data["exceptions"] = exceptions
         return data
 
     def _dict_from_row(self, row: sqlite3.Row):
@@ -437,7 +476,9 @@ class DatabaseProcessor(AbstractDatabaseProcessor):
                     # checked before "tag=" because a scoped combo ("limit=10;tag=x")
                     # still contains the substring "tag=" and would otherwise be
                     # misrouted to _remove_by_tag
-                    console += self._remove_by_limit(run, run_starts, run_tags)
+                    console += self._remove_by_limit(
+                        run, run_starts, run_tags, run_names
+                    )
                 elif "tag=" in run:
                     console += self._remove_by_tag(run, run_starts, run_tags)
                 elif "age=" in run:
@@ -516,22 +557,63 @@ class DatabaseProcessor(AbstractDatabaseProcessor):
             console += f"  WARNING: no runs were removed as no runs were found with tag: {tag}\n"
         return console
 
-    def _remove_by_limit(self, run: str, run_starts: list, run_tags: list = None):
-        """Keep the N newest runs, removing older ones.
+    @staticmethod
+    def _get_run_projects(index: int, run_names: list = None, run_tags: list = None):
+        """Helper function to get the projects a run belongs to.
+
+        A run belongs to a project for every 'project_' run tag it carries and
+        always to the project of its run name, mirroring the grouping of the
+        dashboard overview page. The keys are prefixed so a run name can never
+        collide with a run tag.
+        """
+        projects = []
+        tags = (run_tags[index] if run_tags else "") or ""
+        for tag in tags.split(","):
+            if tag.lower().startswith("project_"):
+                projects.append(f"tag:{tag}")
+        if run_names:
+            projects.append(f"name:{run_names[index]}")
+        # without run names every run ends up in the same project, which keeps the
+        # limit working for callers that cannot provide them
+        return projects or ["name:"]
+
+    def _remove_by_limit(
+        self,
+        run: str,
+        run_starts: list,
+        run_tags: list = None,
+        run_names: list = None,
+    ):
+        """Keep the N newest runs per project, removing older ones.
+
+        The limit is applied per project (a run name and every 'project_' run tag,
+        see _get_run_projects) instead of on the complete run list, so a project
+        that runs less often does not lose its history to a project that runs more
+        often (issue #347). A run that belongs to more than one project is kept as
+        long as it is one of the N newest runs of at least one of them.
 
         When tag filters are appended (e.g. 'limit=10;tag=nightly;tag=prod'),
         the limit is scoped to runs matching any of those tags: the N newest
-        matching runs are kept, older matching runs are removed, and runs that
-        do not match any tag are left untouched.
+        matching runs per project are kept, older matching runs are removed, and
+        runs that do not match any tag are left untouched.
         """
         console = ""
         parts = run.split(";")
         limit = int(parts[0].replace("limit=", ""))
+        # A limit below 1 would slice past the start of the candidate list and
+        # remove every run (issue #333); removing everything is a separate,
+        # explicit action.
+        if limit < 1:
+            print(
+                f"  ERROR: no runs were removed as the provided limit ({limit}) must be at least 1"
+            )
+            console += f"  ERROR: no runs were removed as the provided limit ({limit}) must be at least 1\n"
+            return console
         tag_filters = [
             part.replace("tag=", "") for part in parts[1:] if part.startswith("tag=")
         ]
-        # run_starts are ordered oldest -> newest, so keeping the N newest means
-        # dropping the leading (oldest) candidates.
+        # optional tag scoping narrows which runs are considered at all, runs without
+        # any of the tags are never removed
         if tag_filters and run_tags is not None:
             candidates = [
                 index
@@ -542,13 +624,23 @@ class DatabaseProcessor(AbstractDatabaseProcessor):
         else:
             candidates = list(range(len(run_starts)))
             scope = ""
-        if limit >= len(candidates):
+        # group the candidates per project, run_starts are ordered oldest -> newest so
+        # the last entries of every group are the newest runs of that project
+        candidates_by_project = {}
+        for index in candidates:
+            for project in self._get_run_projects(index, run_names, run_tags):
+                candidates_by_project.setdefault(project, []).append(index)
+        kept = set()
+        for project_indexes in candidates_by_project.values():
+            kept.update(project_indexes[-limit:])
+        removals = [index for index in candidates if index not in kept]
+        if not removals:
             print(
-                f"  WARNING: no runs were removed as the provided limit ({limit}) is higher than the total number of runs{scope} ({len(candidates)})"
+                f"  WARNING: no runs were removed as the provided limit ({limit}) is higher than the number of runs{scope} of every project ({len(candidates)} run(s) in {len(candidates_by_project)} project(s))"
             )
-            console += f"  WARNING: no runs were removed as the provided limit ({limit}) is higher than the total number of runs{scope} ({len(candidates)})\n"
+            console += f"  WARNING: no runs were removed as the provided limit ({limit}) is higher than the number of runs{scope} of every project ({len(candidates)} run(s) in {len(candidates_by_project)} project(s))\n"
             return console
-        for index in candidates[: len(candidates) - limit]:
+        for index in removals:
             self._remove_run(run_starts[index])
             print(
                 f"  Removed run from the database: index={index}, run_start={run_starts[index]}"
@@ -557,9 +649,6 @@ class DatabaseProcessor(AbstractDatabaseProcessor):
         return console
 
     def _remove_by_age(self, run_query: str, run_starts: list):
-        # NOTE: issue #309 / PR #313 only asked for tag-scoped retention on
-        # "limit" (see _remove_by_limit); age intentionally has no tag scoping
-        # here, matching the original issue's proposed direction.
         console = ""
         try:
             clean_query = run_query.replace("age=", "")
@@ -604,6 +693,10 @@ class DatabaseProcessor(AbstractDatabaseProcessor):
                 cursor.execute(DELETE_FROM_SUITES.format(run_start=run_start))
                 cursor.execute(DELETE_FROM_TESTS.format(run_start=run_start))
                 cursor.execute(DELETE_FROM_KEYWORDS.format(run_start=run_start))
+                try:
+                    cursor.execute(DELETE_FROM_EXCEPTIONS.format(run_start=run_start))
+                except Exception:
+                    pass  # table may not exist in older/custom databases
                 # Log inside the transaction: if the write fails, the transaction
                 # rolls back and the run is not deleted.
                 if self.log_removed_path and entry:

@@ -27,7 +27,7 @@ function setup_information_popups() {
     for (const id in customInfoMap) {
         const title = customInfoMap[id];
         const element = document.getElementById(id);
-        if (!element) continue;  // safety check if element not found
+        if (!element) continue;
         element.setAttribute("data-title", title);
     }
 
@@ -73,6 +73,16 @@ function setup_information_popups() {
         } else if (overflowRight) {
             const shiftAmount = tooltipRect.right - (window.innerWidth - padding);
             tooltipEl.style.transform = `translateX(calc(-50% - ${shiftAmount}px))`;
+        }
+
+        // the tooltip hangs below its icon, so a long text on an icon near the bottom of the
+        // window runs off screen: flip it above the icon, keep it inside the window (an icon
+        // that is itself below the fold would take the tooltip off screen with it) and pin it
+        // to the top edge when even that does not fit (a tooltip taller than the window)
+        if (tooltipRect.bottom > window.innerHeight - padding) {
+            const lowestTop = window.innerHeight - tooltipRect.height - padding;
+            top = Math.max(Math.min(rect.top - tooltipRect.height - 8, lowestTop), padding);
+            tooltipEl.style.top = `${top}px`;
         }
     }
 

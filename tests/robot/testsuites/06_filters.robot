@@ -6,21 +6,26 @@ Resource    ../resources/keywords/general-keywords.resource
 
 Suite Setup    Start Browser
 Suite Teardown    Close Browser
-Test Setup    Run Keywords    Generate Dashboard    Open Dashboard
-Test Teardown    Run Keywords    Close Dashboard    Remove Database And Dashboard With Index
+Test Setup    Run Keywords    Generate Shared Dashboard    Open Dashboard
+Test Teardown    Close Dashboard
 
 
 *** Test Cases ***
+Validate Filters Modal Buttons Are Right Aligned
+    Open Filter Dialog
+    Modal Buttons Should Be Right Aligned    modal=filtersModal    last_button=closeFilters
+    Close Filter Dialog
+
 Validate Dashboard Run Name Filter
-    Set Run Filter    value=Tests
+    Set Run Filter    value=WebshopUI
     Validate Component    id=runStatisticsSection    name=runNameFilter    folder=run
 
 Validate Dashboard Run Tags Filter
-    Should Show 15 Of 15 Runs
+    Should Show 18 Of 18 Runs
 
     Set Run Tags Filter    dev
     Validate Component    id=runStatisticsSection    name=runTagsFilterDev    folder=run
-    Should Show 7 Of 7 Runs
+    Should Show 14 Of 14 Runs
 
     Set Run Tags Filter    prod
     # the validation of the screenshot below should be 1 (99% accurate) because there is no data which makes the dates
@@ -30,24 +35,118 @@ Validate Dashboard Run Tags Filter
 
     Set Run Tags Filter    prod    strict=True
     Validate Component    id=runStatisticsSection    name=runTagsFilterProd    folder=run
-    Should Show 8 Of 8 Runs
+    Should Show 4 Of 4 Runs
 
     Set Run Tags Filter    dev    amount    strict=True
     Validate Component    id=runStatisticsSection    name=runTagsFilterAmount    folder=run
     Should Show 1 Of 1 Runs
 
+Validate Dashboard Run Tags Filter From Overview Project Card
+    Open Overview Page
+    Enable Run Tags On Overview Page
+    Open Dashboard Page From Overview Project Card    project=project_1
+    Should Show 10 Of 10 Runs
+    Validate Filter Settings    runTags=project_1
+
+Validate Overview Resets The Project Card Filter When Navigating Back
+    [Documentation]    Issue #348: the overview page shows all projects, so the single project
+    ...                filter that was applied by clicking a project card is dropped again when
+    ...                navigating back to the overview.
+    Open Overview Page
+    Enable Run Tags On Overview Page
+    Open Dashboard Page From Overview Project Card    project=project_1
+    Should Show 10 Of 10 Runs
+    Open Overview Page
+    Should Show 18 Of 18 Runs
+    Validate Filter Settings    runTags=All
+    Wait For Elements State    selector=id=project_2Section    state=visible
+
+Validate Overview Keeps Filters That Were Changed By Hand
+    [Documentation]    Issue #348: only the filter applied by the project card is dropped, a
+    ...                filter the user changed themselves survives the navigation.
+    Open Overview Page
+    Enable Run Tags On Overview Page
+    Open Dashboard Page From Overview Project Card    project=project_1
+    Set Run Tags Filter    project_2    strict=True
+    Should Show 8 Of 8 Runs
+    Open Overview Page
+    Should Show 8 Of 8 Runs
+    Validate Filter Settings    runTags=project_2
+
 Validate Dashboard Date Filter
-    Set Date Filter    fromDate=03132025    fromTime=1225am
+    Set Date Filter    fromDate=08252026    fromTime=1200am
     Validate Component    id=runStatisticsSection    name=runDateFilter    folder=run
+
+Validate Date Histogram Bars
+    Open Filter Dialog
+    Date Histogram Bucket Label Should Be    1 bar = 1 day
+    Date Histogram Should Hold 18 Runs
+    ${datasets}    Get Graph Dataset Labels    dateHistogramChart
+    Should Be Equal    ${datasets}    ${{ ['Failed', 'Skipped', 'Passed'] }}
+    Close Filter Dialog
+
+Validate Date Histogram Drag Zooms Into The Selection
+    Open Filter Dialog
+    Drag On Date Histogram    0.1    0.35
+    # a quarter of the 24 day span is about a week, which is drawn with 6 hour buckets
+    Date Histogram Bucket Label Should Be    1 bar = 6 hours
+    # the drag happened while the bars were days, so the range snapped to whole days
+    Get Property    selector=id=fromTime    property=value    assertion_operator===    assertion_expected=00:00
+    Get Property    selector=id=toTime    property=value    assertion_operator===    assertion_expected=23:59
+    ${runs}    Get Date Histogram Run Count
+    Close Filter Dialog
+    Should Show ${runs} Of ${runs} Runs
+
+Validate Date Histogram Bar Click Selects One Bucket
+    Open Filter Dialog
+    Click On Highest Date Histogram Bar
+    Date Histogram Bucket Label Should Be    1 bar = 1 hour
+    ${fromDate}    Get Property    selector=id=fromDate    property=value
+    ${toDate}    Get Property    selector=id=toDate    property=value
+    Should Be Equal    ${fromDate}    ${toDate}
+    Get Property    selector=id=fromTime    property=value    assertion_operator===    assertion_expected=00:00
+    Get Property    selector=id=toTime    property=value    assertion_operator===    assertion_expected=23:59
+    Close Filter Dialog
+
+Validate Date Histogram Reset Range Button
+    Open Filter Dialog
+    Drag On Date Histogram    0.1    0.35
+    Date Histogram Bucket Label Should Be    1 bar = 6 hours
+    Click    selector=id=dateHistogramReset
+    # the runs outside the zoomed window are back, which they can only be because the bars are
+    # built without the date filter
+    Date Histogram Bucket Label Should Be    1 bar = 1 day
+    Date Histogram Should Hold 18 Runs
+    Close Filter Dialog
+    Should Show 18 Of 18 Runs
+
+Validate Date Histogram Follows The Other Filters
+    Set Run Tags Filter    project_2
+    Open Filter Dialog
+    Date Histogram Should Hold 8 Runs
+    Close Filter Dialog
 
 Validate Dashboard Amount Filter
     Set Amount Filter    amount=5
     Validate Component    id=runStatisticsSection    name=runAmountFilter    folder=run
 
+Validate Dashboard Amount Filter Is Applied Per Project
+    [Documentation]    Issue #347: the amount is applied per project (the run name and every
+    ...                project_ run tag) instead of on the combined run list, so a project with
+    ...                fewer or older runs keeps its section on the overview page.
+    Set Amount Filter    amount=1
+    Should Show 2 Of 18 Runs
+    Open Overview Page
+    Wait For Elements State    selector=id=WebshopUISection    state=visible
+    Wait For Elements State    selector=id=WebshopAPISection    state=visible
+    Enable Run Tags On Overview Page
+    Wait For Elements State    selector=id=project_1Section    state=visible
+    Wait For Elements State    selector=id=project_2Section    state=visible
+
 Add Filter Profile With Runs Filter
-    Set Run Filter    value=Tests
+    Set Run Filter    value=WebshopUI
     Add Filter Profile PrfRuns For    Runs
-    Filter Profile PrfRuns Should Be    {'runs': 'Tests'}
+    Filter Profile PrfRuns Should Be    {'runs': 'WebshopUI'}
 
 Add Filter Profile With Run Tags Filter
     Set Run Tags Filter    prod    project_1
@@ -58,6 +157,45 @@ Add Filter Profile With Versions Filter
     Set Versions Filter    None
     Add Filter Profile PrfVersions For    Versions
     Filter Profile PrfVersions Should Be    {'projectVersions': [{'value': 'All', 'checked': False}, {'value': 'None', 'checked': True}, {'value': '1.2', 'checked': False}, {'value': '1.1', 'checked': False}, {'value': '1.0', 'checked': False}]}
+
+Versions Filter Search Selects Matching Versions
+    Open Filter Dialog
+    Click    selector=id=selectProjectVersion
+    Fill Text    selector=id=projectVersionCheckBoxesFilter    txt=1.
+    ${state10}    Get Checkbox State    selector=id=projectVersionInputItem1.0
+    ${state11}    Get Checkbox State    selector=id=projectVersionInputItem1.1
+    ${state12}    Get Checkbox State    selector=id=projectVersionInputItem1.2
+    ${stateAll}    Get Checkbox State    selector=id=projectVersionInputItemAll
+    ${stateNone}    Get Checkbox State    selector=id=projectVersionInputItemNone
+    Should Be True    ${state10}
+    Should Be True    ${state11}
+    Should Be True    ${state12}
+    Should Not Be True    ${stateAll}
+    Should Not Be True    ${stateNone}
+    Close Filter Dialog
+
+Versions Filter Search Clear Button Keeps Selection
+    Open Filter Dialog
+    Click    selector=id=selectProjectVersion
+    Wait For Elements State    selector=id=projectVersionCheckBoxesFilterClear    state=hidden
+    Fill Text    selector=id=projectVersionCheckBoxesFilter    txt=1.
+    Wait For Elements State    selector=id=projectVersionCheckBoxesFilterClear    state=visible
+    Wait For Elements State    selector=id=projectVersionInputItemNone    state=hidden
+    Click    selector=id=projectVersionCheckBoxesFilterClear
+    Wait For Elements State    selector=id=projectVersionCheckBoxesFilterClear    state=hidden
+    Wait For Elements State    selector=id=projectVersionInputItemNone    state=visible
+    Get Property    selector=id=projectVersionCheckBoxesFilter    property=value    assertion_operator===    assertion_expected=${EMPTY}
+    ${state10}    Get Checkbox State    selector=id=projectVersionInputItem1.0
+    ${state11}    Get Checkbox State    selector=id=projectVersionInputItem1.1
+    ${state12}    Get Checkbox State    selector=id=projectVersionInputItem1.2
+    ${stateAll}    Get Checkbox State    selector=id=projectVersionInputItemAll
+    ${stateNone}    Get Checkbox State    selector=id=projectVersionInputItemNone
+    Should Be True    ${state10}
+    Should Be True    ${state11}
+    Should Be True    ${state12}
+    Should Not Be True    ${stateAll}
+    Should Not Be True    ${stateNone}
+    Close Filter Dialog
 
 Add Filter Profile With Date Filters
     Set Date Filter    fromDate=03132025    fromTime=1225am    toDate=04012025    toTime=1159pm
@@ -77,7 +215,7 @@ Add Filter Profile With Amount Filter
     Filter Profile PrfAmount Should Be    {'amount': '200'}
 
 Applied Filter Profile Adds New Filter
-    Set Run Filter    value=Tests
+    Set Run Filter    value=WebshopUI
     Set Run Tags Filter    prod    project_1
     Set Versions Filter    1.2
     Set Date Filter    fromDate=03102025    fromTime=1010pm    toDate=03142025    toTime=0245am
@@ -86,6 +224,196 @@ Applied Filter Profile Adds New Filter
     ...    FromDate    FromTime    ToDate    ToTime    Amount    open_filter_dialog=False
     Reset Filters
     Apply Filter Profile    profile_name=Profile1
-    Validate Filter Settings    runs=Tests    runTags=prod project_1    versions=1.2
+    Validate Filter Settings    runs=WebshopUI    runTags=prod project_1    versions=1.2
     ...    fromDate=2025-03-10    fromTime=22:10    toDate=2025-03-14    toTime=02:45
     ...    amount=13
+
+Validate Dashboard Run Tags Filter OR Mode
+    [Documentation]    AND needs every selected tag on a run (no fixture run has both), OR any of them.
+    Set Run Tags Filter    prod    amount    strict=True
+    Should Show 0 Of 0 Runs
+    Set Run Tags Mode    OR
+    Should Show 5 Of 5 Runs
+
+Validate Dashboard Run Tags Filter NOT Mode
+    Set Run Tags Filter    prod    amount    strict=True
+    Set Run Tags Mode    NOT
+    Should Show 13 Of 13 Runs
+
+Validate Dashboard Metadata Filter
+    [Documentation]    The four prod runs carry the metadata "Environment: production".
+    Set Metadata Filter    Environment: production
+    Should Show 4 Of 4 Runs
+
+Validate Dashboard Suite Path Filter
+    [Documentation]    Selecting a top-level suite keeps only the runs that contain it and narrows the
+    ...    suite data to that path.
+    Select Suite Path    WebshopAPI
+    Should Show 8 Of 8 Runs
+    ${roots}    Evaluate JavaScript    ${None}    () => [...new Set(filteredSuites.map(suite => suite.full_name.split(".")[0]))]
+    Should Be Equal    ${roots}    ${{ ["WebshopAPI"] }}
+
+Reset Filters Restores Defaults
+    Set Run Filter    value=WebshopUI
+    Set Run Tags Filter    project_1    strict=True
+    Set Run Tags Mode    NOT
+    Set Metadata Filter    Environment: production
+    Select Suite Path    WebshopAPI
+    Set Amount Filter    amount=3
+    Should Show 0 Of 0 Runs
+    Reset Filters
+    Should Show 18 Of 18 Runs
+    # the amount input is clamped to the number of available runs once the filters are applied
+    Validate Filter Settings    runs=All    runTags=All    amount=18
+    Get Selected Options    id=metadata    value    ==    All
+    Get Selected Options    id=tagMode    value    ==    AND
+    Get Property    selector=id=suitePathValue    property=value    assertion_operator===    assertion_expected=All
+
+Deleting A Filter Profile Removes It
+    Set Run Filter    value=WebshopUI
+    Add Filter Profile PrfKeep For    Runs
+    Add Filter Profile PrfDelete For    Runs
+    Delete Filter Profile    PrfDelete
+    Filter Profile PrfDelete Should Not Exist
+    Filter Profile PrfKeep Should Be    {'runs': 'WebshopUI'}
+    Reload Dashboard
+    Filter Profile PrfDelete Should Not Exist
+
+Update Filter Profile After Changing Filters
+    [Documentation]    Once an applied profile is modified the profile select shows a dot and an Update
+    ...    button; updating re-saves only the keys the profile already had.
+    Set Run Filter    value=WebshopUI
+    Add Filter Profile PrfUpdate For    Runs
+    Reset Filters
+    Apply Filter Profile    profile_name=PrfUpdate
+    Set Run Filter    value=WebshopAPI
+    Update Active Filter Profile
+    Filter Profile PrfUpdate Should Be    {'runs': 'WebshopAPI'}
+
+Merge Two Filter Profiles Into A New One
+    [Documentation]    Fields that exist on one side only pass through, so the merge of a runs-only and
+    ...    an amount-only profile carries both.
+    Set Run Filter    value=WebshopUI
+    Add Filter Profile PrfLeft For    Runs
+    Set Amount Filter    amount=5    close_filter_dialog=False
+    Add Filter Profile PrfRight For    Amount    open_filter_dialog=False
+    Merge Filter Profiles Into    PrfLeft    PrfRight    PrfMerged
+    Filter Profile PrfMerged Should Be    {'runs': 'WebshopUI', 'amount': '5'}
+    Reset Filters
+    Apply Filter Profile    profile_name=PrfMerged
+    Validate Filter Settings    runs=WebshopUI    amount=5
+    Should Show 5 Of 10 Runs
+
+Validate Dashboard Custom Filters
+    [Documentation]    --customfilters key=value pairs become one dropdown per key; runs processed without
+    ...    the key are listed under "None". Dimensions combine with AND, values within one dimension with
+    ...    the dropdown's mode.
+    [Setup]    Run Keywords    Generate Dashboard With Custom Filters    Open Dashboard
+    [Teardown]    Run Keywords    Close Dashboard    Remove Database And Dashboard With Index
+    Should Show 5 Of 5 Runs
+    Open Filter Dialog
+    ${dimensions}    Get Custom Filter Dimensions
+    Should Be Equal    ${dimensions}    ${{ ["Browser", "Env"] }}
+    ${values}    Get Custom Filter Values    Browser
+    Should Be Equal    ${values}    ${{ ["All", "None", "chrome", "firefox"] }}
+    Close Filter Dialog
+    Set Custom Filter    Browser    chrome
+    Should Show 3 Of 3 Runs
+    Set Custom Filter Mode    Browser    NOT
+    Should Show 2 Of 2 Runs
+    Set Custom Filter    Browser    None    strict=True
+    Set Custom Filter Mode    Browser    OR
+    Should Show 1 Of 1 Runs
+    Reset Filters
+    Should Show 5 Of 5 Runs
+    Set Custom Filter    Env    prod
+    Should Show 1 Of 1 Runs
+    Set Custom Filter    Browser    firefox
+    Should Show 1 Of 1 Runs
+    Set Custom Filter    Browser    chrome    strict=True
+    Should Show 0 Of 0 Runs
+
+Filter Options Show Run Counts And Grey Out Values Without Runs
+    [Documentation]    Every filter option shows how many runs it still matches with the other filters
+    ...    applied, and options that can no longer match anything are greyed out (they stay visible and
+    ...    selectable). The count of a filter ignores that filter itself, so selecting one of its values
+    ...    never makes the other values disappear.
+    [Setup]    Run Keywords    Generate Dashboard With Custom Filters    Open Dashboard
+    [Teardown]    Run Keywords    Close Dashboard    Remove Database And Dashboard With Index
+    Open Filter Dialog
+    Custom Filter Option Counts Should Be    Browser    ${{ {"All": 5, "None": 1, "chrome": 3, "firefox": 1} }}
+    Unavailable Custom Filter Values Should Be    Browser    ${{ [] }}
+    Check Custom Filter Value    Env    prod
+    # the only prod run is the firefox one, so chrome and None cannot match anything anymore
+    Custom Filter Option Counts Should Be    Browser    ${{ {"All": 1, "None": 0, "chrome": 0, "firefox": 1} }}
+    Unavailable Custom Filter Values Should Be    Browser    ${{ ["None", "chrome"] }}
+    Custom Filter Option Counts Should Be    Env    ${{ {"All": 5, "None": 1, "prod": 1, "staging": 3} }}
+    Unavailable Custom Filter Values Should Be    Env    ${{ [] }}
+    Close Filter Dialog
+    Should Show 1 Of 1 Runs
+
+Filter Option Counts And Greying Out Can Be Turned Off
+    [Documentation]    Both are settings, for users who do not want the extra numbers or the dimmed
+    ...    options in the filter modal.
+    [Setup]    Run Keywords    Generate Dashboard With Custom Filters    Open Dashboard
+    [Teardown]    Run Keywords    Close Dashboard    Remove Database And Dashboard With Index
+    Toggle Setting    toggleFilterCounts    tab=defaults
+    Toggle Setting    toggleFilterAvailability    tab=defaults
+    Setting Should Be    show.filterCounts    ${False}
+    Setting Should Be    show.filterAvailability    ${False}
+    Open Filter Dialog
+    Check Custom Filter Value    Env    prod
+    Custom Filter Option Counts Should Be    Browser    ${{ {} }}
+    Unavailable Custom Filter Values Should Be    Browser    ${{ [] }}
+    Close Filter Dialog
+Validate Dashboard Custom Filters Hidden Per Page
+    [Documentation]    "Settings > Filters" hides custom filter keys per page: a hidden key gets no dropdown in
+    ...    the filter modal on that page, is not applied there, and is left off the Overview run cards. The
+    ...    selection of a hidden key is kept, so it applies again on the pages where it is still shown.
+    [Setup]    Run Keywords    Generate Dashboard With Custom Filters    Open Dashboard
+    [Teardown]    Run Keywords    Close Dashboard    Remove Database And Dashboard With Index
+    Open Overview Page
+    ${keys}    Get Overview Run Card Custom Filter Keys
+    Should Be Equal    ${keys}    ${{ ["Browser", "Env"] }}
+    Hide Custom Filters On Page    Overview    Env
+    Open Overview Page
+    ${keys}    Get Overview Run Card Custom Filter Keys
+    Should Be Equal    ${keys}    ${{ ["Browser"] }}
+    Open Filter Dialog
+    ${dimensions}    Get Custom Filter Dimensions
+    Should Be Equal    ${dimensions}    ${{ ["Browser"] }}
+    Close Filter Dialog
+    Open Dashboard Page
+    Open Filter Dialog
+    ${dimensions}    Get Custom Filter Dimensions
+    Should Be Equal    ${dimensions}    ${{ ["Browser", "Env"] }}
+    Close Filter Dialog
+    Set Custom Filter    Env    prod
+    Should Show 1 Of 1 Runs
+    Open Overview Page
+    Should Show 5 Of 5 Runs
+    Open Dashboard Page
+    Should Show 1 Of 1 Runs
+    # the option counts have to follow the data: on the overview Env is hidden and therefore not
+    # applied, so it may not narrow the Browser counts there either
+    Open Overview Page
+    Open Filter Dialog
+    Custom Filter Option Counts Should Be    Browser    ${{ {"All": 5, "None": 1, "chrome": 3, "firefox": 1} }}
+    Unavailable Custom Filter Values Should Be    Browser    ${{ [] }}
+    Close Filter Dialog
+    Open Dashboard Page
+    Open Filter Dialog
+    Custom Filter Option Counts Should Be    Browser    ${{ {"All": 1, "None": 0, "chrome": 0, "firefox": 1} }}
+    Unavailable Custom Filter Values Should Be    Browser    ${{ ["None", "chrome"] }}
+    Close Filter Dialog
+
+Information Popups In The Filter Modal Stay Inside The Window
+    [Documentation]    The popups hang below their icon, so the long ones near the bottom of the modal
+    ...    used to run off screen. They flip above the icon instead (createTooltip in information.js).
+    ...    The suite viewport is 2000px high, which is too tall for any popup to overflow, so the
+    ...    window is shrunk to a realistic height first.
+    Set Viewport Size    width=1600    height=800
+    Open Filter Dialog
+    ${offscreen}    Evaluate JavaScript    ${None}
+    ...    () => [...document.querySelectorAll("#filtersModal .information[data-title]")].flatMap(el => { el.dispatchEvent(new MouseEvent("mouseover", { bubbles: true })); const tip = document.querySelector(".tooltip-popup"); if (!tip) return []; const r = tip.getBoundingClientRect(); const fits = r.top >= 0 && r.bottom <= window.innerHeight && r.left >= 0 && r.right <= window.innerWidth; return fits ? [] : [el.id + " " + Math.round(r.top) + "-" + Math.round(r.bottom) + " of " + window.innerHeight]; })
+    Should Be Empty    ${offscreen}    msg=information popups rendered outside the window

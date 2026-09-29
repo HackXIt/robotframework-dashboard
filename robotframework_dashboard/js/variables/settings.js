@@ -18,8 +18,6 @@ var settings = {
         runName: true,
         totalStats: true,
         latestRuns: true,
-        percentageFilters: true,
-        versionFilters: true,
         sortFilters: true,
         suitePathsSuiteSection: false,
         suitePathsTestSection: false,
@@ -39,10 +37,13 @@ var settings = {
         sectionFiltersApplyKeyword: true,
         testOnlyChanges: false,
         testStatusFilter: "All",
+        testRerunView: "reruns",
+        compareRerunView: "reruns",
         compareOnlyChanges: false,
         compareStatusFilter: "All",
     },
     show: {
+        overviewDurationPercentage: 20,
         unified: false,
         dateLabels: true,
         legends: true,
@@ -57,6 +58,12 @@ var settings = {
         convertTimezone: false,
         suitesSelectionInSuiteStats: "First Suite",
         suitesSelectionInTestStats: "First Suite",
+        filterAvailability: true,
+        filterCounts: true,
+        hiddenCustomFiltersOverview: [],
+        hiddenCustomFiltersDashboard: [],
+        hiddenCustomFiltersCompare: [],
+        hiddenCustomFiltersTables: [],
     },
     theme_colors: {
         light: {
@@ -141,7 +148,6 @@ var settings = {
     }
 };
 
-// Returns the run label for an item (run/suite/test/keyword) based on the current aliases mode.
 function get_run_label(item) {
     const mode = settings.show.aliases;
     if (mode === "alias") return item.run_alias;

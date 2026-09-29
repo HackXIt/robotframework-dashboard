@@ -1,12 +1,18 @@
-# Sample workflow for building and deploying a VitePress site to GitHub Pages
+# Build the versioned VitePress docs site and deploy it to GitHub Pages.
 #
+# Layout (see scripts/docs/build-versioned-docs.mjs):
+#   /        latest release tag      /dev/  main (unreleased)
+#   /vX.Y.Z/ every release tag       /versions.json
 name: Deploy RobotDashboard docs site to Pages
 
+# A release tag points at the same commit as the main push that created it, and
+# the build checks out every release tag itself, so a tag trigger would only add
+# a duplicate run -- one the github-pages environment rejects, since its
+# deployment branch policy allows main (and guides) but no tag ref.
 on:
-  # Runs on pushes targeting the `main` branch. Change this to `master` if you're
-  # using the `master` branch as the default branch.
   push:
     branches: [main]
+  workflow_dispatch:
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
@@ -22,29 +28,53 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
-          fetch-depth: 0 # Not needed if lastUpdated is not enabled
-      # - uses: pnpm/action-setup@v4 # Uncomment this block if you're using pnpm
-      #   with:
-      #     version: 9 # Not needed if you've set "packageManager" in package.json
-      # - uses: oven-sh/setup-bun@v1 # Uncomment this if you're using Bun
+          fetch-depth: 0 # every release tag is checked out into a worktree
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
           node-version: 24
-          cache: npm # or pnpm / yarn
+          cache: npm
       - name: Setup Pages
-        uses: actions/configure-pages@v4
+        uses: actions/configure-pages@v6
+      # The /dev/ build rebuilds example/robot_dashboard.html from its worktree, so the
+      # unreleased example shows what main does instead of what the last release did. Only
+      # the dependencies of the package are needed: scripts/example.py runs it from source.
+      - name: Setup Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      - name: Install the package dependencies for the dev example dashboard
+        run: pip install .
       - name: Install dependencies
-        run: npm ci # or pnpm install / yarn install / bun install
-      - name: Build with VitePress
-        run: npm run docs:build # or pnpm docs:build / yarn docs:build / bun run docs:build
+        run: npm ci
+      # Released versions never change: their finished builds are kept between
+      # runs and only rebuilt when the shared docs config/theme or scripts change.
+      # A new run always restores the most recent cache (restore-keys prefix)
+      # and saves a new one only when the build script rebuilt something.
+      - name: Restore built docs versions
+        uses: actions/cache/restore@v5
+        with:
+          path: .docs-dist-cache
+          key: docs-dist-cache-${{ github.run_id }}
+          restore-keys: docs-dist-cache-
+      - name: Build every docs version with VitePress
+        run: npm run docs:build:versions -- --main-ref origin/main
+        env:
+          DOCS_CACHE_DIR: .docs-dist-cache
+      - name: Save built docs versions
+        if: hashFiles('.docs-dist-cache/.updated') != ''
+        uses: actions/cache/save@v5
+        with:
+          path: .docs-dist-cache
+          key: docs-dist-cache-${{ github.run_id }}
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: docs/.vitepress/dist
 
@@ -54,9 +84,9 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     name: Deploy
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

@@ -8,7 +8,6 @@ Suite Teardown    Run Teardown Only Once    keyword=Remove Database And Dashboar
 
 *** Variables ***
 ${OUTPUTS_FOLDER}    ${CURDIR}/../resources/outputs
-${OS}   ${None}    # set on runtime
 
 
 *** Test Cases ***
@@ -25,10 +24,10 @@ Validate RobotDashboard version
     Validate CLI    command=robotdashboard -d version.db --version    expected=version
 
 Validate RobotDashboard o
-    Validate CLI    command=robotdashboard -d o.db -o ${OUTPUTS_FOLDER}/output-20250313-002222.xml:tag1   expected=outputpath
+    Validate CLI    command=robotdashboard -d o.db -o ${OUTPUTS_FOLDER}/output-20260818-021545.xml:tag1   expected=outputpath
 
 Validate RobotDashboard outputpath
-    Validate CLI    command=robotdashboard -d outputpath.db --outputpath ${OUTPUTS_FOLDER}/output-20250313-002222.xml
+    Validate CLI    command=robotdashboard -d outputpath.db --outputpath ${OUTPUTS_FOLDER}/output-20260818-021545.xml
     ...       expected=outputpath
 
 Validate RobotDashboard f
@@ -39,12 +38,12 @@ Validate RobotDashboard outputfolderpath
 
 Validate RobotDashboard r
     Validate CLI    command=robotdashboard -d r.db --outputfolderpath ${OUTPUTS_FOLDER}
-    Validate CLI    command=robotdashboard -d r.db -r "index=0:3;-1;6,run_start=2025-03-13 00:27:39.871333,alias=abc,tag=tag1"    expected=removerun
+    Validate CLI    command=robotdashboard -d r.db -r "index=0:3;-1;6,run_start=2026-09-01 02:15:19.481484,alias=abc,tag=tag1"    expected=removerun
 
 Validate RobotDashboard removerun
     Validate CLI    command=robotdashboard -d removerun.db --outputfolderpath ${OUTPUTS_FOLDER}
     Validate CLI
-    ...    command=robotdashboard -d removerun.db --removerun "index=0:3;-1;6" --removerun "run_start=2025-03-13 00:27:39.871333" --removerun alias=abc,tag=tag1
+    ...    command=robotdashboard -d removerun.db --removerun "index=0:3;-1;6" --removerun "run_start=2026-09-01 02:15:19.481484" --removerun alias=abc,tag=tag1
     ...    expected=removerun
 
 Validate RobotDashboard d
@@ -78,24 +77,12 @@ Validate RobotDashboard dashboardtitle
     Validate CLI    command=robotdashboard -d dashboardtitle.db --dashboardtitle "Another very interesting title 91239192"    expected=dashboardtitle
 
 Validate RobotDashboard c
-    [Documentation]    This test will probably fail if you don't have a custom mysql database running
-    IF    '${OS}' != 'Windows'    Skip    msg=Skipping this test in the pipeline as it only runs on local machines where mysql is installed
-    Validate CLI    command=robotdashboard -d c.db -c example/database/mysql.py    expected=databaseclass
+    [Documentation]    example/database/sqlite3.py is the reference copy of the built-in database class; it is loaded
+    ...    through the --databaseclass import path and must process an output like the built-in one does.
+    Validate CLI    command=robotdashboard -d c.db -c example/database/sqlite3.py -o ${OUTPUTS_FOLDER}/output-20260910-060011.xml    expected=databaseclass
 
 Validate RobotDashboard databaseclass
-    [Documentation]    This test will probably fail if you don't have a custom mysql database running
-    IF    '${OS}' != 'Windows'    Skip    msg=Skipping this test in the pipeline as it only runs on local machines where mysql is installed
-    Validate CLI    command=robotdashboard -d databaseclass.db --databaseclass ./example/database/mysql.py    expected=databaseclass
-
-Validate RobotDashboard s
-    Skip    msg=Might have to implement process library to run in a separate shell and do more tests
-    Validate CLI    command=robotdashboard --outputfolderpath ${OUTPUTS_FOLDER} -g f
-    Validate CLI    command=robotdashboard -s 127.0.0.1:8543    expected=server
-
-Validate RobotDashboard server
-    Skip    msg=Might have to implement process library to run in a separate shell and do more tests
-    Validate CLI    command=robotdashboard --outputfolderpath ${OUTPUTS_FOLDER} -g f
-    Validate CLI    command=robotdashboard --server default    expected=server
+    Validate CLI    command=robotdashboard -d databaseclass.db --databaseclass ./example/database/sqlite3.py -o ${OUTPUTS_FOLDER}/output-20260910-060011.xml    expected=databaseclass
 
 Validate RobotDashboard m
     Validate CLI    command=robotdashboard -d m.db -m ./example/messageconfig.txt    expected=messageconfig

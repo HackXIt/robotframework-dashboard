@@ -1,11 +1,19 @@
 import json
+import re
 import zlib
 import base64
 import pytest
 from robotframework_dashboard.dashboard import DashboardGenerator
 
+EMBEDDED_PAYLOAD_ORDER = ["runs", "suites", "tests", "keywords", "exceptions"]
 
-# --- _compress_and_encode ---
+
+def _embedded_payload(content, name):
+    """Decode one embedded data payload, load_data() in data.js decodes them in this order."""
+    payloads = re.findall(r'decode_and_decompress\("([^"]+)"\)', content)
+    assert len(payloads) == len(EMBEDDED_PAYLOAD_ORDER), "data payloads not found in dashboard"
+    return json.loads(zlib.decompress(base64.b64decode(payloads[EMBEDDED_PAYLOAD_ORDER.index(name)])))
+
 
 def test_compress_and_encode_returns_string():
     result = DashboardGenerator()._compress_and_encode({"key": "value"})
@@ -51,8 +59,6 @@ def test_compress_and_encode_unicode():
     assert decoded == obj
 
 
-# --- _minify_text ---
-
 def test_minify_text_removes_blank_lines():
     text = "line1\n\nline2\n\nline3\n"
     result = DashboardGenerator()._minify_text(text)
@@ -90,8 +96,6 @@ def test_minify_text_no_trailing_newline():
     result = DashboardGenerator()._minify_text("a\nb\n")
     assert not result.endswith("\n")
 
-
-# --- generate_dashboard ---
 
 from datetime import datetime
 from pathlib import Path
@@ -157,6 +161,19 @@ def test_generate_dashboard_with_message_config(tmp_path):
     assert "Template" in content
 
 
+def test_generate_dashboard_message_config_with_quotes(tmp_path):
+    # quotes in a pattern must survive the round trip through the JS string literal
+    patterns = ["Page '${url}' failed", 'Element "${sel}" not found', "back\\slash"]
+    output = _call_generate(tmp_path, message_config=patterns)
+    content = output.read_text(encoding="utf-8")
+    match = re.search(r"var message_config = '(.*?)'\n", content)
+    assert match, "message_config literal not found"
+    js_literal = match.group(1)
+    # undo the JS single-quote string escaping, then the JSON encoding
+    decoded = js_literal.replace("\\'", "'").replace("\\\\", "\\")
+    assert json.loads(decoded) == patterns
+
+
 def test_generate_dashboard_with_json_config(tmp_path):
     output = _call_generate(tmp_path, json_config='{"theme": "dark"}')
     content = output.read_text(encoding="utf-8")
@@ -193,8 +210,6 @@ def test_generate_dashboard_subdirectory_created(tmp_path):
     )
     assert subdir_output.exists()
 
-
-# --- _make_paths_relative ---
 
 import os
 
@@ -311,9 +326,7 @@ def test_generate_dashboard_uselogs_embeds_relative_paths(tmp_path):
     )
     content = dashboard.read_text(encoding="utf-8")
     # Extract the base64 payload for runs
-    match = re.search(r'const runs = decode_and_decompress\("([^"]+)"\)', content)
-    assert match, "runs payload not found in dashboard"
-    decoded = json.loads(zlib.decompress(base64.b64decode(match.group(1))))
+    decoded = _embedded_payload(content, "runs")
     assert decoded[0]["path"] == "output.xml"
     assert str(tmp_path).replace("\\", "/") not in decoded[0]["path"]
 
@@ -340,7 +353,56 @@ def test_generate_dashboard_server_mode_keeps_absolute_paths(tmp_path):
         no_autoupdate=False,
     )
     content = dashboard.read_text(encoding="utf-8")
-    match = re.search(r'const runs = decode_and_decompress\("([^"]+)"\)', content)
-    assert match, "runs payload not found in dashboard"
-    decoded = json.loads(zlib.decompress(base64.b64decode(match.group(1))))
+    decoded = _embedded_payload(content, "runs")
     assert decoded[0]["path"] == abs_path
+
+
+def test_generate_dashboard_embeds_exceptions(tmp_path):
+    import json, zlib, base64, re
+    dashboard = tmp_path / "dashboard.html"
+    data = {
+        "runs": [], "suites": [], "tests": [], "keywords": [],
+        "exceptions": [{"run_start": "2025-01-01", "message": "Timeout error", "amount": 2}],
+    }
+    DashboardGenerator().generate_dashboard(
+        name_dashboard=str(dashboard),
+        data=data,
+        generation_datetime=datetime(2025, 1, 1),
+        dashboard_title="",
+        server=False,
+        json_config=None,
+        message_config=[],
+        quantity=20,
+        use_logs=False,
+        offline=False,
+        force_json_config=False,
+        no_autoupdate=False,
+    )
+    content = dashboard.read_text(encoding="utf-8")
+    decoded = _embedded_payload(content, "exceptions")
+    assert decoded[0]["message"] == "Timeout error"
+    assert decoded[0]["amount"] == 2
+
+
+def test_generate_dashboard_missing_exceptions_key_defaults_to_empty(tmp_path):
+    """generate_dashboard() tolerates data lacking an 'exceptions' key (data.get default)."""
+    dashboard = tmp_path / "dashboard.html"
+    data = {"runs": [], "suites": [], "tests": [], "keywords": []}
+    DashboardGenerator().generate_dashboard(
+        name_dashboard=str(dashboard),
+        data=data,
+        generation_datetime=datetime(2025, 1, 1),
+        dashboard_title="",
+        server=False,
+        json_config=None,
+        message_config=[],
+        quantity=20,
+        use_logs=False,
+        offline=False,
+        force_json_config=False,
+        no_autoupdate=False,
+    )
+    content = dashboard.read_text(encoding="utf-8")
+    import json, zlib, base64, re
+    decoded = _embedded_payload(content, "exceptions")
+    assert decoded == []

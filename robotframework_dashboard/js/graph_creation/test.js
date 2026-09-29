@@ -4,7 +4,7 @@ import { get_messages_data } from "../graph_data/messages.js";
 import { get_duration_deviation_data } from "../graph_data/duration_deviation.js";
 import { get_graph_config } from "../graph_data/graph_config.js";
 import { build_tooltip_meta, lookup_tooltip_meta, format_status } from "../graph_data/tooltip_helpers.js";
-import { update_height } from "../graph_data/helpers.js";
+import { update_height, format_attempt_lines } from "../graph_data/helpers.js";
 import { open_log_file } from "../log.js";
 import { format_duration } from "../common.js";
 import { inFullscreen, inFullscreenGraph, ignoreSkips, ignoreSkipsRecent, filteredTests } from "../variables/globals.js";
@@ -13,7 +13,6 @@ import { create_chart, update_chart } from "./chart_factory.js";
 import { build_most_failed_config, build_most_flaky_config, build_most_time_consuming_config } from "./config_helpers.js";
 import { get_test_stats_data } from "../graph_data/stats.js";
 
-// build functions
 function _build_test_statistics_config() {
     const graphType = settings.graphTypes.testStatisticsGraphType || "timeline";
 
@@ -44,6 +43,7 @@ function _build_test_statistics_timeline_config() {
                         const truncated = meta.message.length > 120 ? meta.message.substring(0, 120) + "..." : meta.message;
                         lines.push(`Message: ${truncated}`);
                     }
+                    lines.push(...format_attempt_lines(meta.attempts));
                 }
                 return lines;
             },
@@ -159,6 +159,7 @@ function _build_test_statistics_line_config() {
                                 const truncated = point.message.length > 120 ? point.message.substring(0, 120) + "..." : point.message;
                                 lines.push(`Message: ${truncated}`);
                             }
+                            lines.push(...format_attempt_lines(point.attempts));
                             return lines;
                         },
                     },
@@ -334,7 +335,6 @@ function _build_test_most_time_consuming_config() {
     return build_most_time_consuming_config("testMostTimeConsuming", "test", "Test", _get_test_most_filtered_data(), "onlyLastRunTest");
 }
 
-// create functions
 function create_test_statistics_graph() { create_chart("testStatisticsGraph", _build_test_statistics_config); }
 function create_test_duration_graph() { create_chart("testDurationGraph", _build_test_duration_config); }
 function create_test_messages_graph() { create_chart("testMessagesGraph", _build_test_messages_config); }
@@ -345,7 +345,6 @@ function create_test_most_failed_graph() { create_chart("testMostFailedGraph", _
 function create_test_recent_most_failed_graph() { create_chart("testRecentMostFailedGraph", _build_test_recent_most_failed_config); }
 function create_test_most_time_consuming_graph() { create_chart("testMostTimeConsumingGraph", _build_test_most_time_consuming_config); }
 
-// update functions
 function update_test_statistics_graph() { update_chart("testStatisticsGraph", _build_test_statistics_config); }
 function update_test_duration_graph() { update_chart("testDurationGraph", _build_test_duration_config); }
 function update_test_messages_graph() { update_chart("testMessagesGraph", _build_test_messages_config); }

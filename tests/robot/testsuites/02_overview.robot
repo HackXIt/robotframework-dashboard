@@ -7,8 +7,8 @@ Resource    ../resources/keywords/general-keywords.resource
 
 Suite Setup    Start Browser
 Suite Teardown    Stop Browser
-Test Setup    Run Keywords    Generate Dashboard    Open Dashboard
-Test Teardown    Run Keywords    Close Dashboard    Remove Database And Dashboard With Index
+Test Setup    Run Keywords    Generate Shared Dashboard    Open Dashboard
+Test Teardown    Close Dashboard
 
 
 *** Test Cases ***
@@ -38,35 +38,34 @@ Validate Total Statistics Use Run Tags
     Click    selector=id=collapsegridOverviewTotal
     Validate Component    id=overviewTotalStatsSection    name=totalStatisticsRunTags    folder=overview
 
-Validate Project Tests
+Validate Project WebshopUI
     Open Overview Page
-    Click    selector=id=collapseTestsBody
-    Validate Component    id=TestsSection    name=prjTests    folder=overview
+    Click    selector=id=collapseWebshopUIBody
+    Validate Component    id=WebshopUISection    name=prjWebshopUI    folder=overview
 
-Validate Project Tests With Version Filter
+Validate Project WebshopAPI
     Open Overview Page
-    Click    selector=id=collapseTestsBody
-    Fill Text    selector=id=TestsVersionFilterSearch    txt=1.1
-    Validate Component    id=TestsSection    name=prjTestsV1_1    folder=overview
+    Click    selector=id=collapseWebshopAPIBody
+    Validate Component    id=WebshopAPISection    name=prjWebshopAPI    folder=overview
 
-Validate Project Testsuites
+Overview Section Track Follows The Project Bar Settings
+    [Documentation]    Switching the project bars on or off changes which overview sections exist, so
+    ...    the section track has to be rebuilt with them. It used to keep items for bars that were
+    ...    switched off, which then scrolled nowhere.
     Open Overview Page
-    Click    selector=id=collapseTestsuitesBody
-    Validate Component    id=TestsuitesSection    name=prjTestsuites    folder=overview
-
-Validate Project Testsuites With Version Filter
-    Open Overview Page
-    Click    selector=id=collapseTestsuitesBody
-    Fill Text    selector=id=TestsuitesVersionFilterSearch    txt=1.1
-    Validate Component    id=TestsuitesSection    name=prjTestsuitesV1_1    folder=overview
-
-Validate Project Other
-    Open Overview Page
-    Click    selector=id=collapseTestsuitesBody
-    Validate Component    id=TestsuitesSection    name=prjOther    folder=overview
-
-Validate Project Other With Version Filter
-    Open Overview Page
-    Click    selector=id=collapseTestsuitesBody
-    Fill Text    selector=id=TestsuitesVersionFilterSearch    txt=1.1
-    Validate Component    id=TestsuitesSection    name=prjOtherV1_1    folder=overview
+    ${stale}    Get Stale Section Track Items    overviewNavTrack    overview
+    Should Be Empty    ${stale}
+    Click    selector=id=settings
+    Click    selector=id=overview-tab
+    Click    selector=id=switchRunTags
+    Click    selector=id=closeSettings
+    Wait For Dashboard Idle
+    ${stale}    Get Stale Section Track Items    overviewNavTrack    overview
+    Should Be Empty    ${stale}
+    Click    selector=id=settings
+    Click    selector=id=overview-tab
+    Click    selector=id=switchRunName
+    Click    selector=id=closeSettings
+    Wait For Dashboard Idle
+    ${stale}    Get Stale Section Track Items    overviewNavTrack    overview
+    Should Be Empty    ${stale}

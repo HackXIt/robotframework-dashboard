@@ -7,11 +7,10 @@ from robotframework_dashboard.processors import OutputProcessor
 from robotframework_dashboard.arguments import LogRemovedConfig
 
 OUTPUTS_DIR = Path(__file__).parent.parent / "robot" / "resources" / "outputs"
-SAMPLE_XML = OUTPUTS_DIR / "output-20250313-002134.xml"
-SAMPLE_XML_2 = OUTPUTS_DIR / "output-20250313-002151.xml"
+ALL_XML = sorted(OUTPUTS_DIR.glob("output-*.xml"))
+SAMPLE_XML, SAMPLE_XML_2, SAMPLE_XML_3, SAMPLE_XML_4 = ALL_XML[:4]
+SAMPLE_LOG = OUTPUTS_DIR / SAMPLE_XML.name.replace("output-", "log-").replace(".xml", ".html")
 
-
-# --- open / close ---
 
 def test_open_database_creates_connection(db):
     db.open_database()
@@ -25,8 +24,6 @@ def test_close_database_closes_connection(db):
     with pytest.raises(Exception):
         db.connection.cursor()
 
-
-# --- _create_tables ---
 
 def test_create_tables_results_in_four_tables(db):
     db.open_database()
@@ -58,7 +55,7 @@ def test_tests_table_column_count(db):
     db.open_database()
     cols = db.connection.cursor().execute("PRAGMA table_info(tests)").fetchall()
     db.close_database()
-    assert len(cols) == 12
+    assert len(cols) == 13
 
 
 def test_keywords_table_column_count(db):
@@ -68,30 +65,32 @@ def test_keywords_table_column_count(db):
     assert len(cols) == 12
 
 
-# --- run_start_exists ---
-
 def test_run_start_not_in_empty_db(db):
     db.open_database()
     assert db.run_start_exists("2025-03-13 00:21:34.707148") is False
     db.close_database()
 
 
+def _sample_run_start():
+    """run_start of SAMPLE_XML as stored in the DB, without timezone suffix."""
+    processor = OutputProcessor(SAMPLE_XML)
+    return str(processor.get_run_start())
+
+
 def test_run_start_exists_after_insert(populated_db):
     populated_db.open_database()
     # The fixture stores with +01:00; startswith check in run_start_exists handles this
-    result = populated_db.run_start_exists("2025-03-13 00:21:34.707148")
+    result = populated_db.run_start_exists(_sample_run_start())
     populated_db.close_database()
     assert result is True
 
 
 def test_run_start_with_full_tz_also_found(populated_db):
     populated_db.open_database()
-    result = populated_db.run_start_exists("2025-03-13 00:21:34.707148+01:00")
+    result = populated_db.run_start_exists(_sample_run_start() + "+01:00")
     populated_db.close_database()
     assert result is True
 
-
-# --- insert_output_data / get_data ---
 
 def test_insert_and_get_data_round_trip(populated_db):
     populated_db.open_database()
@@ -136,8 +135,6 @@ def test_project_version_stored(tmp_path):
     db.close_database()
     assert result["runs"][0]["project_version"] == "2.5.0"
 
-
-# --- remove_runs ---
 
 def _insert_second_run(populated_db):
     """Helper: insert a second run from a different XML into populated_db."""
@@ -187,8 +184,9 @@ def test_remove_by_tag_no_match_is_noop(populated_db):
 
 
 def test_remove_by_limit_keeps_most_recent(populated_db):
+    # SAMPLE_XML and SAMPLE_XML_3 are two runs of the same project (run name)
     populated_db.open_database()
-    _insert_second_run(populated_db)
+    _insert_run(populated_db, SAMPLE_XML_3, [])
     assert len(populated_db.get_data()["runs"]) == 2
     populated_db.remove_runs(["limit=1"])
     assert len(populated_db.get_data()["runs"]) == 1
@@ -201,7 +199,17 @@ def test_remove_by_limit_higher_than_count_is_noop(populated_db):
     assert len(populated_db.get_data()["runs"]) == 1
 
 
-# --- remove_runs by limit scoped to tag(s) (issue #309) ---
+def test_remove_by_limit_below_one_is_rejected(populated_db):
+    """Issue #333: limit=0 / negative must not slice away every run."""
+    populated_db.open_database()
+    _insert_second_run(populated_db)
+    for limit in ("limit=0", "limit=-1"):
+        console = populated_db.remove_runs([limit])
+        assert "ERROR" in console
+        assert "must be at least 1" in console
+        assert len(populated_db.get_data()["runs"]) == 2
+    populated_db.close_database()
+
 
 def _insert_run(db, xml, tags):
     """Helper: insert a run from the given XML with the given tags."""
@@ -221,42 +229,42 @@ def _run_starts(db):
 
 def test_remove_by_limit_with_single_tag_keeps_newest_matching(db):
     db.open_database()
-    # oldest -> newest; three "nightly" runs + one unrelated "release" run
-    _insert_run(db, OUTPUTS_DIR / "output-20250313-002134.xml", ["nightly"])
-    _insert_run(db, OUTPUTS_DIR / "output-20250313-002151.xml", ["nightly"])
-    _insert_run(db, OUTPUTS_DIR / "output-20250313-002222.xml", ["nightly"])
-    _insert_run(db, OUTPUTS_DIR / "output-20250313-002257.xml", ["release"])
+    # oldest -> newest; three "nightly" runs of one project + one unrelated "release" run
+    _insert_run(db, SAMPLE_XML, ["nightly"])
+    _insert_run(db, SAMPLE_XML_2, ["release"])
+    _insert_run(db, SAMPLE_XML_3, ["nightly"])
+    _insert_run(db, SAMPLE_XML_4, ["nightly"])
     starts_before = _run_starts(db)  # ordered oldest -> newest
     db.remove_runs(["limit=2;tag=nightly"])
     starts_after = _run_starts(db)
     # oldest nightly removed; 2 newest nightly + release remain
     assert len(starts_after) == 3
     assert starts_before[0] not in starts_after  # oldest nightly removed
-    assert starts_before[3] in starts_after  # release untouched
+    assert starts_before[1] in starts_after  # release untouched
     db.close_database()
 
 
 def test_remove_by_limit_with_multiple_tags(db):
     db.open_database()
-    _insert_run(db, OUTPUTS_DIR / "output-20250313-002134.xml", ["alpha"])
-    _insert_run(db, OUTPUTS_DIR / "output-20250313-002151.xml", ["beta"])
-    _insert_run(db, OUTPUTS_DIR / "output-20250313-002222.xml", ["alpha"])
-    _insert_run(db, OUTPUTS_DIR / "output-20250313-002257.xml", ["gamma"])
+    _insert_run(db, SAMPLE_XML, ["alpha"])
+    _insert_run(db, SAMPLE_XML_2, ["gamma"])
+    _insert_run(db, SAMPLE_XML_3, ["beta"])
+    _insert_run(db, SAMPLE_XML_4, ["alpha"])
     starts_before = _run_starts(db)
-    # candidates = union of alpha+beta = 3 oldest runs; keep 2 newest of those
+    # candidates = union of alpha+beta = 3 runs of one project; keep 2 newest of those
     db.remove_runs(["limit=2;tag=alpha;tag=beta"])
     starts_after = _run_starts(db)
     assert len(starts_after) == 3
     assert starts_before[0] not in starts_after  # oldest alpha removed
-    assert starts_before[3] in starts_after  # gamma untouched
+    assert starts_before[1] in starts_after  # gamma untouched
     db.close_database()
 
 
 def test_remove_by_limit_with_tag_higher_than_count_is_noop(db):
     db.open_database()
-    _insert_run(db, OUTPUTS_DIR / "output-20250313-002134.xml", ["nightly"])
-    _insert_run(db, OUTPUTS_DIR / "output-20250313-002151.xml", ["nightly"])
-    _insert_run(db, OUTPUTS_DIR / "output-20250313-002222.xml", ["other"])
+    _insert_run(db, SAMPLE_XML, ["nightly"])
+    _insert_run(db, SAMPLE_XML_2, ["nightly"])
+    _insert_run(db, SAMPLE_XML_3, ["other"])
     console = db.remove_runs(["limit=5;tag=nightly"])
     assert len(db.get_data()["runs"]) == 3
     assert "WARNING" in console
@@ -265,24 +273,58 @@ def test_remove_by_limit_with_tag_higher_than_count_is_noop(db):
 
 def test_remove_by_limit_only_ignores_tags(db):
     db.open_database()
-    _insert_run(db, OUTPUTS_DIR / "output-20250313-002134.xml", ["nightly"])
-    _insert_run(db, OUTPUTS_DIR / "output-20250313-002151.xml", ["release"])
-    _insert_run(db, OUTPUTS_DIR / "output-20250313-002222.xml", ["nightly"])
+    _insert_run(db, SAMPLE_XML, ["nightly"])
+    _insert_run(db, SAMPLE_XML_3, ["release"])
     starts_before = _run_starts(db)
-    # no tag scope -> global limit, keep 1 newest regardless of tag
+    # no tag scope -> the limit is applied per project regardless of the tags, and both
+    # runs are of the same project, so only the newest one remains
     db.remove_runs(["limit=1"])
     starts_after = _run_starts(db)
     assert starts_after == [starts_before[-1]]  # only the newest remains
     db.close_database()
 
 
-# NOTE: issue #309 only asked for tag-scoped retention on "limit"
-# (see the block above). "age" intentionally has no tag-scoped variant:
-# db.remove_runs(["age=10d", "tag=nightly"]) runs as two independent
-# operations, same as before this feature — no dedicated test needed here
-# beyond the existing plain "age=10d" / "tag=x" coverage.
+def test_remove_by_limit_is_applied_per_run_name(db):
+    """Issue #347: a project with fewer runs keeps its history."""
+    db.open_database()
+    # SAMPLE_XML/_3/_4 are runs of one project, SAMPLE_XML_2 of another
+    _insert_run(db, SAMPLE_XML, [])
+    _insert_run(db, SAMPLE_XML_2, [])
+    _insert_run(db, SAMPLE_XML_3, [])
+    _insert_run(db, SAMPLE_XML_4, [])
+    starts_before = _run_starts(db)
+    db.remove_runs(["limit=1"])
+    starts_after = _run_starts(db)
+    # the newest run of both projects remains instead of only the newest run overall
+    assert starts_after == [starts_before[1], starts_before[3]]
+    db.close_database()
 
-# --- list_runs ---
+
+def test_remove_by_limit_is_applied_per_project_tag(db):
+    """Issue #347: the same holds for projects that are grouped by a 'project_' tag."""
+    db.open_database()
+    # all three runs share a run name, so only the project tags can separate them
+    _insert_run(db, SAMPLE_XML, ["project_a"])
+    _insert_run(db, SAMPLE_XML_3, ["project_b"])
+    _insert_run(db, SAMPLE_XML_4, ["project_a"])
+    starts_before = _run_starts(db)
+    db.remove_runs(["limit=1"])
+    starts_after = _run_starts(db)
+    # the only run of project_b survives next to the newest run of project_a
+    assert starts_after == [starts_before[1], starts_before[2]]
+    db.close_database()
+
+
+def test_remove_by_limit_warns_when_every_project_is_below_the_limit(db):
+    db.open_database()
+    _insert_run(db, SAMPLE_XML, [])
+    _insert_run(db, SAMPLE_XML_2, [])
+    console = db.remove_runs(["limit=1"])
+    assert len(db.get_data()["runs"]) == 2
+    assert "WARNING" in console
+    assert "2 project(s)" in console
+    db.close_database()
+
 
 def test_list_runs_empty_prints_warning(db, capsys):
     db.open_database()
@@ -300,8 +342,6 @@ def test_list_runs_populated_prints_run_info(populated_db, capsys):
     assert "Run 0" in captured.out
 
 
-# --- vacuum_database ---
-
 def test_vacuum_database_returns_console(populated_db):
     populated_db.open_database()
     console = populated_db.vacuum_database()
@@ -309,12 +349,10 @@ def test_vacuum_database_returns_console(populated_db):
     assert "Vacuumed" in console
 
 
-# --- update_output_path ---
-
 def test_update_output_path_found(populated_db):
     populated_db.open_database()
-    # SAMPLE_XML is stored as path; its corresponding log is log-20250313-002134.html
-    log_path = str(OUTPUTS_DIR / "log-20250313-002134.html")
+    # SAMPLE_XML is stored as path; its corresponding log has the same stamp
+    log_path = str(SAMPLE_LOG)
     console = populated_db.update_output_path(log_path)
     populated_db.close_database()
     assert "Executed query" in console
@@ -326,8 +364,6 @@ def test_update_output_path_not_found(populated_db):
     populated_db.close_database()
     assert "ERROR" in console
 
-
-# --- remove_runs by run_start ---
 
 def test_remove_runs_by_run_start(populated_db):
     populated_db.open_database()
@@ -361,8 +397,6 @@ def test_remove_runs_semicolon_separated_indexes(populated_db):
     populated_db.close_database()
 
 
-# --- get_data with duplicate aliases ---
-
 def test_get_data_duplicate_aliases(tmp_path):
     """Two runs with the same alias → second gets a counter suffix."""
     db = DatabaseProcessor(tmp_path / "dup.db")
@@ -386,8 +420,6 @@ def test_get_data_duplicate_aliases(tmp_path):
     assert any(a != "same_alias" and "same_alias" in a for a in aliases)
 
 
-# --- get_data without timezone stored (adds local tz) ---
-
 def test_get_data_run_without_timezone_gets_tz_appended(tmp_path):
     db = DatabaseProcessor(tmp_path / "notz.db")
     processor = OutputProcessor(SAMPLE_XML)
@@ -402,8 +434,6 @@ def test_get_data_run_without_timezone_gets_tz_appended(tmp_path):
     assert re.match(r".*[+-]\d{2}:\d{2}$", result["runs"][0]["run_start"])
 
 
-# --- _has_timezone_offset (static) ---
-
 @pytest.mark.parametrize("run_start,expected", [
     ("2025-03-13 00:21:34.707148+01:00", True),
     ("2025-03-13 00:21:34.707148-05:30", True),
@@ -416,14 +446,10 @@ def test_has_timezone_offset(run_start, expected):
     assert DatabaseProcessor._has_timezone_offset(run_start) is expected
 
 
-# --- _get_local_timezone_offset (static) ---
-
 def test_get_local_timezone_offset_format():
     result = DatabaseProcessor._get_local_timezone_offset()
     assert re.match(r"^[+-]\d{2}:\d{2}$", result), f"Unexpected format: {result}"
 
-
-# --- _dict_from_row (static) ---
 
 def test_dict_from_row():
     conn = sqlite3.connect(":memory:")
@@ -431,14 +457,11 @@ def test_dict_from_row():
     conn.execute("CREATE TABLE t (a TEXT, b INTEGER)")
     conn.execute("INSERT INTO t VALUES ('hello', 42)")
     row = conn.execute("SELECT * FROM t").fetchone()
-    # _dict_from_row is an instance method (no @staticmethod decorator)
     db_inst = DatabaseProcessor.__new__(DatabaseProcessor)
     result = db_inst._dict_from_row(row)
     conn.close()
     assert result == {"a": "hello", "b": 42}
 
-
-# --- schema migration ---
 
 def test_schema_migration_runs_table_from_10_to_14(tmp_path):
     """A legacy runs table with 10 columns should be migrated to 15 columns."""
@@ -487,11 +510,9 @@ def test_schema_migration_runs_table_from_10_to_14(tmp_path):
 
     assert len(runs_cols) == 15
     assert len(suites_cols) == 11
-    assert len(tests_cols) == 12
+    assert len(tests_cols) == 13
     assert len(keywords_cols) == 12
 
-
-# --- insert_output_data exception path ---
 
 def test_insert_output_data_exception_prints_error(db, capsys):
     """insert_output_data catches exceptions from _insert_runs and prints an error."""
@@ -504,8 +525,6 @@ def test_insert_output_data_exception_prints_error(db, capsys):
     captured = capsys.readouterr()
     assert "ERROR" in captured.out
 
-
-# --- get_data backward-compatibility branches ---
 
 def test_get_data_null_run_alias_generates_auto_alias(db):
     """get_data() assigns 'Alias 1' when run_alias is NULL (pre-0.6.0 compat)."""
@@ -577,18 +596,18 @@ def test_get_data_null_test_tags_and_id(db):
          "2020-01-01", "tag", "alias_ti", "/path.xml", "{}", None, None),
     )
     db.connection.execute(
-        "INSERT INTO tests VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT INTO tests VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
         ("2020-01-01 00:00:00+00:00", "Suite.Test", "Test", 1, 0, 0, "0.1",
-         "2020-01-01", "OK", None, "alias_ti", None),
+         "2020-01-01", "OK", None, "alias_ti", None, None),
     )
     db.connection.commit()
     data = db.get_data()
     db.close_database()
     assert len(data["tests"]) == 1
     assert data["tests"][0]["tags"] == ""
+    assert data["tests"][0]["attempts"] == ""
 
 
-# --- _get_run_data ---
 def test_get_run_data_returns_dict_for_existing_run(populated_db):
     populated_db.open_database()
     run_start = populated_db.get_data()["runs"][0]["run_start"]
@@ -604,8 +623,6 @@ def test_get_run_data_returns_none_for_missing_run(populated_db):
     populated_db.close_database()
     assert result is None
 
-
-# --- _log_run_jsonl ---
 
 def test_log_run_jsonl_creates_file_and_writes_entry(tmp_path):
     import json
@@ -633,8 +650,6 @@ def test_log_run_jsonl_serializes_datetime(tmp_path):
     parsed = json.loads(logpath.read_text())
     assert "2025-01-01" in parsed["run_start"]
 
-
-# --- _remove_run with logging ---
 
 def test_remove_run_with_logging_writes_jsonl_and_deletes(tmp_path):
     import json
@@ -668,8 +683,6 @@ def test_remove_run_logging_failure_rolls_back_delete(tmp_path):
     db.close_database()
 
 
-# --- remove_runs bare except branch ---
-
 def test_remove_runs_exception_branch_logs_error(populated_db):
     """remove_runs() catches exceptions (e.g. index parse error) in its bare except."""
     populated_db.open_database()
@@ -678,3 +691,127 @@ def test_remove_runs_exception_branch_logs_error(populated_db):
     console = populated_db.remove_runs(["index=not_a_number"])
     populated_db.close_database()
     assert "ERROR" in console
+
+
+def test_insert_and_get_exceptions(tmp_path):
+    """Exceptions inserted via _insert_exceptions appear in get_data()."""
+    db = DatabaseProcessor(tmp_path / "exc.db")
+    processor = OutputProcessor(SAMPLE_XML)
+    processor.get_run_start()
+    data = processor.get_output_data()
+    run_start = data["runs"][0][0]
+    data["exceptions"] = [(run_start, "Timeout error", 3)]
+    db.open_database()
+    db.insert_output_data(data, [], "alias", SAMPLE_XML, None, timezone="+02:00")
+    result = db.get_data()
+    db.close_database()
+    assert len(result["exceptions"]) == 1
+    assert result["exceptions"][0]["message"] == "Timeout error"
+    assert result["exceptions"][0]["amount"] == 3
+
+
+def test_insert_exceptions_without_timezone(tmp_path):
+    """Exceptions inserted without timezone get local tz appended by get_data()."""
+    db = DatabaseProcessor(tmp_path / "exc_notz.db")
+    processor = OutputProcessor(SAMPLE_XML)
+    processor.get_run_start()
+    data = processor.get_output_data()
+    run_start = data["runs"][0][0]
+    data["exceptions"] = [(run_start, "Connection refused", 1)]
+    db.open_database()
+    db.insert_output_data(data, [], "alias", SAMPLE_XML, None, timezone="")
+    result = db.get_data()
+    db.close_database()
+    assert len(result["exceptions"]) == 1
+    assert re.match(r".*[+-]\d{2}:\d{2}$", result["exceptions"][0]["run_start"])
+
+
+def test_insert_output_data_without_exceptions_key_defaults_to_empty(tmp_path):
+    """insert_output_data() tolerates output_data lacking an 'exceptions' key."""
+    db = DatabaseProcessor(tmp_path / "exc_missing_key.db")
+    processor = OutputProcessor(SAMPLE_XML)
+    processor.get_run_start()
+    data = processor.get_output_data()
+    del data["exceptions"]
+    db.open_database()
+    db.insert_output_data(data, [], "alias", SAMPLE_XML, None, timezone="+01:00")
+    result = db.get_data()
+    db.close_database()
+    assert result["exceptions"] == []
+
+
+def test_remove_run_deletes_exceptions(tmp_path):
+    """_remove_run also deletes from the exceptions table."""
+    db = DatabaseProcessor(tmp_path / "exc_rm.db")
+    processor = OutputProcessor(SAMPLE_XML)
+    processor.get_run_start()
+    data = processor.get_output_data()
+    run_start = data["runs"][0][0]
+    data["exceptions"] = [(run_start, "Error X", 2)]
+    db.open_database()
+    db.insert_output_data(data, [], "alias", SAMPLE_XML, None, timezone="+01:00")
+    assert len(db.get_data()["exceptions"]) == 1
+    db.remove_runs(["index=0"])
+    assert len(db.get_data()["exceptions"]) == 0
+    db.close_database()
+
+
+def test_remove_run_without_exceptions_table(tmp_path):
+    """get_data() and _remove_run handle a missing exceptions table gracefully
+    (e.g. a custom database class, or a table dropped out-of-band)."""
+    db_path = tmp_path / "no_exc_table.db"
+    conn = sqlite3.connect(str(db_path))
+    conn.execute("""CREATE TABLE runs ("run_start" TEXT, "full_name" TEXT, "name" TEXT,
+        "total" INTEGER, "passed" INTEGER, "failed" INTEGER, "skipped" INTEGER,
+        "elapsed_s" TEXT, "start_time" TEXT, "tags" TEXT, "run_alias" TEXT,
+        "path" TEXT, "metadata" TEXT, "project_version" TEXT, "custom_filters" TEXT,
+        UNIQUE(run_start, full_name))""")
+    conn.execute("""CREATE TABLE suites ("run_start" TEXT, "full_name" TEXT, "name" TEXT,
+        "total" INTEGER, "passed" INTEGER, "failed" INTEGER, "skipped" INTEGER,
+        "elapsed_s" TEXT, "start_time" TEXT, "run_alias" TEXT, "id" TEXT)""")
+    conn.execute("""CREATE TABLE tests ("run_start" TEXT, "full_name" TEXT, "name" TEXT,
+        "passed" INTEGER, "failed" INTEGER, "skipped" INTEGER, "elapsed_s" TEXT,
+        "start_time" TEXT, "message" TEXT, "tags" TEXT, "run_alias" TEXT, "id" TEXT)""")
+    conn.execute("""CREATE TABLE keywords ("run_start" TEXT, "name" TEXT,
+        "passed" INTEGER, "failed" INTEGER, "skipped" INTEGER, "times_run" TEXT,
+        "total_time_s" TEXT, "average_time_s" TEXT, "min_time_s" TEXT,
+        "max_time_s" TEXT, "run_alias" TEXT, "owner" TEXT)""")
+    conn.execute("INSERT INTO runs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        ("2020-01-01 00:00:00+00:00", "Suite", "Suite", 1, 1, 0, 0, "1.0",
+         "2020-01-01", "tag", "alias", "/path.xml", "{}", None, None))
+    conn.commit()
+    conn.close()
+    # Opening via DatabaseProcessor creates the exceptions table (all columns already
+    # current, so no migration branches fire) — drop it again to simulate a database
+    # that somehow doesn't have it (e.g. a custom database class).
+    db = DatabaseProcessor(str(db_path))
+    db.open_database()
+    db.connection.cursor().execute("DROP TABLE IF EXISTS exceptions")
+    db.connection.commit()
+    # get_data should handle the missing exceptions table
+    data = db.get_data()
+    assert data["exceptions"] == []
+    # remove_runs should also handle the missing exceptions table
+    db.remove_runs(["index=0"])
+    assert len(db.get_data()["runs"]) == 0
+    db.close_database()
+
+
+def test_insert_and_get_data_round_trips_test_attempts(db):
+    attempts = '[{"status": "FAIL", "message": "boom"}, {"status": "PASS", "message": ""}]'
+    data = {
+        "runs": [("2020-01-01 00:00:00", "Suite", "Suite", 1, 1, 0, 0, "1.0", "2020-01-01", "[]")],
+        "suites": [],
+        "tests": [
+            ("2020-01-01 00:00:00", "Suite.Retried", "Retried", 1, 0, 0, "0.1", "2020-01-01", "", "[]", "s1-t1", attempts),
+            ("2020-01-01 00:00:00", "Suite.Once", "Once", 1, 0, 0, "0.1", "2020-01-01", "", "[]", "s1-t2", ""),
+        ],
+        "keywords": [],
+    }
+    db.open_database()
+    db.insert_output_data(data, tags=[], run_alias="alias", path="/p.xml", project_version="")
+    tests = {row["name"]: row for row in db.get_data()["tests"]}
+    db.close_database()
+    assert tests["Retried"]["attempts"] == attempts
+    assert tests["Retried"]["run_alias"] == "alias"
+    assert tests["Once"]["attempts"] == ""

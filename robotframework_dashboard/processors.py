@@ -2,6 +2,72 @@ from robot.api import ExecutionResult, ResultVisitor
 from robot.result.model import TestCase, TestSuite, Keyword
 from datetime import datetime
 from pathlib import Path
+from collections import Counter
+from html import unescape
+from json import dumps
+from re import compile, DOTALL
+
+# `rebot --merge` (used after `robot --rerunfailed`) keeps only the final result of a
+# re-executed test, but records every earlier attempt in the test message as HTML:
+#   *HTML* <span class="merge">Test has been re-executed and results merged.</span>
+#   <hr><span class="new-status">New status:</span> <span class="pass">PASS</span><br>
+#   <span class="new-message">New message:</span> ...<br>
+#   <hr><span class="old-status">Old status:</span> <span class="fail">FAIL</span><br>
+#   <span class="old-message">Old message:</span> ...<br>
+# Each further merge prepends its result, so the "old" blocks run newest to oldest.
+MERGE_HEADER_RE = compile(
+    r"^\*HTML\*\s*<span class=\"merge\">(?:Test|Task) has been re-executed and results merged\.</span>"
+)
+MERGE_ATTEMPT_RE = compile(
+    r"<span class=\"(?:new|old)-status\">(?:New|Old) status:</span>\s*<span class=\"\w+\">(\w+)</span><br>"
+    r"(?:<span class=\"(?:new|old)-message\">(?:New|Old) message:</span>\s*(.*?)<br>)?",
+    DOTALL,
+)
+# The variant rebot writes when the re-execution was skipped: the original result is
+# kept and the skipped attempt is only mentioned in the message.
+MERGE_SKIPPED_RE = compile(
+    r"^\*HTML\*\s*(?:Test|Task) has been re-executed and results merged\. Latter result had "
+    r"<span class=\"skip\">SKIP</span> status and was ignored\. Message:\n(.*?)(?:<hr>(.*))?$",
+    DOTALL,
+)
+
+
+def parse_merged_message(message: str, status: str):
+    """Split a `rebot --merge` message into the final message and the attempt history.
+
+    Returns (message, attempts) where attempts is a list of {"status", "message"}
+    dicts from the first attempt to the last, or an empty list when the message is
+    not a merge message.
+    """
+    skipped = MERGE_SKIPPED_RE.match(message)
+    if skipped:
+        skip_message, previous = skipped.group(1), skipped.group(2) or ""
+        previous_message, attempts = parse_merged_message(previous, status)
+        if not attempts:
+            attempts = [{"status": status, "message": previous_message}]
+        attempts.append({"status": "SKIP", "message": unescape(skip_message.strip())})
+        return previous_message, attempts
+    if not MERGE_HEADER_RE.match(message):
+        return message, []
+    attempts = [
+        {"status": found_status, "message": unescape((found_message or "").strip())}
+        for found_status, found_message in MERGE_ATTEMPT_RE.findall(message)
+    ]
+    if not attempts:
+        return message, []
+    attempts.reverse()
+    return attempts[-1]["message"], attempts
+
+
+def get_suite_start_time(suite: TestSuite):
+    """Start time of a suite; `rebot --merge` clears it on merged suites, fall back to the earliest test."""
+    if hasattr(suite, "start_time"):
+        start_time = suite.start_time
+        if start_time is None:
+            starts = [test.start_time for test in suite.all_tests if test.start_time is not None]
+            start_time = min(starts) if starts else None
+        return start_time
+    return suite.starttime
 
 
 class OutputProcessor:
@@ -43,6 +109,8 @@ class OutputProcessor:
         self.execution_result.visit(
             KeywordProcessor(self.generation_time, keyword_list)
         )
+        exception_processor = ExceptionProcessor(self.generation_time)
+        self.execution_result.visit(exception_processor)
         if not suite_list:
             print("  WARNING: No suites found in output, suite data will be empty!")
         if not test_list:
@@ -58,6 +126,7 @@ class OutputProcessor:
             "suites": suite_list,
             "tests": test_list,
             "keywords": average_keyword_list,
+            "exceptions": exception_processor.get_aggregated_exceptions(),
         }
 
     def calculate_keyword_averages(self, keyword_list: list):
@@ -133,9 +202,9 @@ class OutputProcessor:
             run_metadata_items.append(f"{cleaned_key}: {cleaned_value}")
         run_metadata_items += suite_metadata_items
 
-        # Convert tuple to list, update last element, then back to tuple
         run = list(run_list[0])
-        run[-1] = str(list(set(run_metadata_items)))
+        # dedupe while keeping document order; a set would reorder per process (hash seed)
+        run[-1] = str(list(dict.fromkeys(run_metadata_items)))
         run_list[0] = tuple(run)
 
         return run_list, new_suite_list
@@ -160,10 +229,7 @@ class RunProcessor(ResultVisitor):
             elapsed_time = round(suite.elapsed_time.total_seconds(), 3)
         else:
             elapsed_time = round(suite.elapsedtime / 1000, 3)
-        if hasattr(suite, "start_time"):
-            start_time = suite.start_time
-        else:
-            start_time = suite.starttime
+        start_time = get_suite_start_time(suite)
 
         self.run_list.append(
             (
@@ -204,10 +270,7 @@ class SuiteProcessor(ResultVisitor):
                 elapsed_time = round(suite.elapsed_time.total_seconds(), 3)
             else:
                 elapsed_time = round(suite.elapsedtime / 1000, 3)
-            if hasattr(suite, "start_time"):
-                start_time = suite.start_time
-            else:
-                start_time = suite.starttime
+            start_time = get_suite_start_time(suite)
 
             self.suite_list.append(
                 (
@@ -248,6 +311,11 @@ class TestProcessor(ResultVisitor):
         else:
             start_time = test.starttime
 
+        status = "PASS" if test.passed else "FAIL" if test.failed else "SKIP"
+        message, attempts = parse_merged_message(test.message, status)
+        for attempt in attempts:
+            attempt["message"] = attempt["message"][:150]
+
         self.test_list.append(
             (
                 self.run_time,
@@ -258,9 +326,10 @@ class TestProcessor(ResultVisitor):
                 test.skipped,
                 elapsed_time,
                 start_time,
-                test.message[:150],
+                message[:150],
                 str(test.tags).replace(" ", ""),
                 test.id,
+                dumps(attempts) if attempts else "",
             )
         )
 
@@ -310,3 +379,37 @@ class KeywordProcessor(ResultVisitor):
                 owner,
             )
         )
+
+
+class ExceptionProcessor(ResultVisitor):
+    """Processor to collect exception messages from keywords inside TRY/EXCEPT blocks"""
+
+    def __init__(self, run_time: datetime):
+        self.run_time = run_time
+        self._try_depth = 0
+        self._exception_counts = Counter()
+        self._child_failed = []
+
+    def start_try_branch(self, branch):
+        if branch.type == "TRY":
+            self._try_depth += 1
+
+    def end_try_branch(self, branch):
+        if branch.type == "TRY":
+            self._try_depth -= 1
+
+    def start_keyword(self, keyword: Keyword):
+        self._child_failed.append(False)
+
+    def end_keyword(self, keyword: Keyword):
+        child_already_counted = self._child_failed.pop()
+        if self._try_depth > 0 and keyword.failed and keyword.message and not child_already_counted:
+            self._exception_counts[keyword.message[:150]] += 1
+        if self._child_failed and keyword.failed:
+            self._child_failed[-1] = True
+
+    def get_aggregated_exceptions(self):
+        return [
+            (self.run_time, message, count)
+            for message, count in self._exception_counts.items()
+        ]

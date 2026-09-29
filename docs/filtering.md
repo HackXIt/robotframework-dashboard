@@ -10,12 +10,18 @@ RobotFramework Dashboard provides flexible filtering options across different pa
 
 ## Overview Page
 
-The **Overview** page does not have global filters. However, it offers a few **display settings**:
+The **Overview** page uses the same **global filters** as the Dashboard page (see below): open the filter modal from the top navigation bar and every project bar, the Latest Runs bar and the Total Stats bar reflect the filtered set of runs. A dot on the filter icon indicates a filter is active.
 
-- **Display By Name** – Toggle whether to display the names of projects in the statistics.
-- **Display By Tag** – Toggle whether to use custom project tags if defined in your test run metadata. (See [Advanced CLI & Examples](advanced-cli-examples.md#project-tagging) for more information on Tags!)
-- **Duration Percentage Threshold** – Adjust the percentage threshold used to color-code durations (faster/slower runs).
-- **Select Versions** – Filter the displayed runs by their associated versions.
+Two things behave differently here, because the Overview is meant to show *all* your projects:
+
+- The **[Amount filter](#_8-amount-per-project) is applied per project**, so a project that runs less often never disappears behind the runs of a project that runs more often.
+- Clicking a **project card** filters the Dashboard to that single project. Navigating **back to the Overview** drops that filter again so all projects are shown. Filters you changed yourself in the filter modal are kept.
+
+In addition, the Overview offers a few **display settings** under **Settings > Overview**:
+
+- **Projects by Name** – Toggle whether to display the names of projects in the statistics.
+- **Projects by Tag** – Toggle whether to use custom project tags if defined in your test run metadata. (See [Advanced CLI & Examples](advanced-cli-examples.md#project-tagging) for more information on Tags!)
+- **Duration comparison percentage** – Adjust the percentage threshold used to color-code durations (faster/slower runs).
 
 > These settings affect only the way the statistics are presented on the Overview page.
 
@@ -26,6 +32,19 @@ The **Dashboard** page provides both **global filters** and **section-specific f
 ### Global Filters
 
 Global filters are applied to the entire dashboard, affecting all sections and graphs. Open the filter modal using the filter icon in the top navigation bar.
+
+#### Run Counts and Unavailable Options
+
+Every option of the Runs, Run Tags, Versions, Metadata and Custom Filters dropdowns shows how many runs it still matches:
+
+- The number behind an option is calculated with **all other filters applied**, so it tells you what you get if you select that option. The Amount filter ("most recent X runs") is not included, as it is not a category.
+- The count of a filter **ignores that filter itself**. Selecting one Run Tag therefore never changes the counts of the other Run Tags, and they never disappear from the list.
+- A count always answers the same question: *how many runs remain if this option is the selection of this filter*. In **NOT** mode an option excludes its runs, so its count is what is left over.
+- Options that match no runs at all are **greyed out**. They stay visible and can still be selected (the dashboard then simply shows no runs), so you never lose sight of the values in your data.
+- A custom filter that is hidden on the current page (see [Settings - Filters Tab](/settings#filter-settings-filters-tab)) is not applied there, so it does not count towards the numbers of the other filters either.
+- Both can be turned off in [Settings](settings.md): *Display Run Counts in Filter Options* and *Grey Out Filter Options Without Runs*.
+
+Example: with two custom filters where `filter_1=A` only ever occurs together with `filter_2=C`, selecting `filter_1=A` shows `filter_2=D (0)` greyed out, because no run has that combination.
 
 #### 1. Runs
 
@@ -52,19 +71,28 @@ Global filters are applied to the entire dashboard, affecting all sections and g
 - **All** (ticked by default) means no version filter is applied.
 - **None** covers runs that have no version label set.
 - A dot next to the label indicates the filter is active.
-- Use the search box inside the dropdown to quickly find a version by name.
+- Typing in the search box inside the dropdown selects every matching version and unselects the rest (e.g. `1.` selects all `1.x` versions in one go).
+- Click the **X** in the search box to clear it while keeping the current selection. Deleting characters one by one instead re-runs the matching on every keystroke.
 
-#### 4. From Date / From Time
+#### 4. Runs over Time (date histogram)
 
-- Sets the earliest point in time a run must have started at to be included.
-- Runs that started before this date and time are excluded.
-- Defaults to the date and time of the oldest run in the data (with a small margin to account for seconds and daylight saving time).
+A bar chart of how many runs started in each time bucket, sitting directly above the date range. It replaces typing dates with dragging: the bars show where the runs actually are, so you can pick the period straight off the chart.
 
-#### 5. To Date / To Time
+- **Bars** show the number of runs per bucket, stacked by run status: red for runs with failures, yellow for runs that only skipped, green for the rest. Vertical separators mark every bucket, so gaps in the data stay readable.
+- **Drag across the chart** to select a range. The From/To fields below are filled in and the chart **zooms into the selection**, re-bucketing finer, so dragging again drills further down (a month at a bar per day, then a week at a bar per 6 hours, then a day at a bar per hour).
+- **Click a single bar** to select just that bucket.
+- **Reset Range** returns to the full span of the data. Widening the From/To fields by hand does the same.
+- The bucket size is chosen from the visible range and is printed next to the chart as `1 bar = 1 day`. Hovering a bar shows its exact time range and, per run in it, how many tests passed, failed and were skipped — the same shape as the hover on the run graphs.
+- The bars follow every other filter (runs, run tags, versions, metadata, custom filters, suite path) but not the date range itself — the date range is the part of the timeline you are looking at, which is why widening it brings the runs outside it straight back. The *Amount per project* filter is not applied to the bars either.
 
-- Sets the latest point in time a run must have started at to be included.
-- Runs that started after this date and time are excluded.
-- Defaults to the date and time of the most recent run in the data (with a small margin).
+#### 5. From / To Date and Time
+
+The four fields below the chart are the range itself, and they stay editable by hand.
+
+- **From Date / From Time** set the earliest point in time a run must have started at to be included; runs that started before it are excluded.
+- **To Date / To Time** set the latest point in time; runs that started after it are excluded.
+- They default to the oldest and most recent run in the data (with a small margin to account for seconds and daylight saving time), which is also what **Reset Range** restores.
+- Typing in them moves the histogram above, exactly like dragging moves them.
 
 #### 6. Metadata
 
@@ -87,12 +115,17 @@ Global filters are applied to the entire dashboard, affecting all sections and g
 - **None** covers runs that have no value stored for that key.
 - Use the **Mode** dropdown to control matching: **OR** (default), **AND**, or **NOT**.
 - A dot next to the label indicates the filter is active.
+- Custom filter values are also printed on the Overview run cards, one `key: value` line per attribute the run has.
+- Attributes you do not want can be hidden per page under **Settings → Filters**; a hidden attribute gets no dropdown here and is not applied on that page. See [Settings - Filters Tab](/settings#filter-settings-filters-tab).
 - See [Advanced CLI & Examples](/advanced-cli-examples#custom-filters) for how to attach custom filter data to runs.
 
-#### 8. Amount
+#### 8. Amount per project
 
-- After all other filters have been applied, limits the dashboard to the **most recent X runs**.
-- Use **All Runs** to set the value to the total number of runs currently matching the other filters.
+- After all other filters have been applied, limits the dashboard to the **most recent X runs per project**.
+- A project is a run name and every `project_` run tag, the same grouping the [Overview page](/tabs-pages#overview-page) uses.
+- The limit is **not** applied to the combined run list. A run is kept as long as it is one of the most recent X runs of at least one of its projects, which means the total number of shown runs can be higher than X.
+- Because of this, a project that runs less often is never pushed out of the Overview (or the Dashboard) by a project that runs more often.
+- Use **All Runs** to set the value to the total number of runs currently matching the other filters, which shows every run of every project.
 - Useful for focusing on recent history without changing the date filters.
 
 #### 8. Suite Path
@@ -104,7 +137,7 @@ Global filters are applied to the entire dashboard, affecting all sections and g
   - Click any **breadcrumb segment** to jump back up to that level.
 - After the run filter is applied, suites and tests are also narrowed to only those matching the selected path prefix — so all graphs and tables reflect only the chosen path.
 - A dot next to the label indicates the filter is active.
-- The Suite Path filter is applied after all other run-level filters but before the Amount limit, so "most recent X runs" always refers to runs that contain the selected path.
+- The Suite Path filter is applied after all other run-level filters but before the Amount limit, so "most recent X runs per project" always refers to runs that contain the selected path.
 
 ### Filter Profiles
 
@@ -214,7 +247,7 @@ The **Tables** page allows for detailed inspection of raw test data and uses the
 
 | Page | Filter support |
 |------|---------------|
-| **Overview** | Display-only settings (name, tag, duration threshold, versions) |
+| **Overview** | Same global filters as Dashboard + display settings (name, tag, duration threshold) |
 | **Dashboard** | Full global filters + section-specific filters + Filter Profiles |
 | **Compare** | Run selection dropdowns + suite paths toggle |
 | **Tables** | Same global filters as Dashboard |
