@@ -35,7 +35,10 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git remote add upstream https://github.com/MarketSquare/robotframework-dashboard.git
-          git fetch upstream main --tags
+          # The fork has published tags that differ from upstream (e.g. v2.0.0).
+          # Isolate upstream tags so fetching cannot replace or reject fork tags.
+          git fetch --no-tags upstream main 'refs/tags/*:refs/upstream-tags/*'
+          git fetch --no-tags origin 'refs/tags/*:refs/fork-tags/*'
 
           before="$(git rev-parse HEAD)"
           git merge --no-edit upstream/main
@@ -47,4 +50,10 @@ jobs:
             git push origin HEAD:main
           fi
 
-          git push origin --tags
+          while IFS= read -r tag; do
+            if git show-ref --verify --quiet "refs/fork-tags/$tag"; then
+              echo "Keeping published fork tag $tag."
+              continue
+            fi
+            git push origin "refs/upstream-tags/$tag:refs/tags/$tag"
+          done < <(git for-each-ref --format='%(refname:strip=2)' refs/upstream-tags/)
