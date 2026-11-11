@@ -4,13 +4,15 @@ vi.mock('@js/variables/globals.js', () => import('./mocks/globals.js'));
 vi.mock('@js/variables/data.js', () => import('./mocks/data.js'));
 vi.mock('@js/variables/graphs.js', () => import('./mocks/graphs.js'));
 
-import { strip_tz_suffix, get_run_projects } from '@js/common.js';
+import { strip_tz_suffix, get_run_projects, parse_custom_filters } from '@js/common.js';
 import {
+    apply_custom_filter_dimension,
+    apply_date_filter,
+    build_date_range,
     dashboardPages,
     get_active_page,
     get_hidden_custom_filters,
     get_transformed_data,
-    parse_custom_filters,
     sort_wall_clock,
 } from '@js/filter/pipeline.js';
 import { runs } from '@js/variables/data.js';
@@ -120,6 +122,14 @@ describe('filter.js pure logic', () => {
             expect(get_transformed_data('runs')[0].run_start).toBe('2025-01-15 09:05:03');
             settings.show.milliseconds = true;
             expect(get_transformed_data('runs')[0].run_start).toBe('2025-01-15 09:05:03.123');
+        });
+
+        it('keeps the stored run_start on transformed runs for the notes', () => {
+            settings.show.milliseconds = false;
+            settings.show.convertTimezone = true;
+            const transformed = get_transformed_data('runs')[0];
+            expect(transformed.run_start).not.toBe('2025-01-15 09:05:03.123+02:00');
+            expect(transformed.raw_run_start).toBe('2025-01-15 09:05:03.123+02:00');
         });
     });
 
@@ -450,5 +460,43 @@ describe('filter.js parse_custom_filters', () => {
         expect(parse_custom_filters('=chrome:Env=prod')).toEqual({ Env: 'prod' });
         expect(parse_custom_filters('')).toEqual({});
         expect(parse_custom_filters(null)).toEqual({});
+    });
+});
+
+describe('custom filter modes', () => {
+    const cfRuns = [
+        { run_start: '1', custom_filters: 'env=prod' },
+        { run_start: '2', custom_filters: 'env=staging' },
+        { run_start: '3', custom_filters: '' },
+    ];
+    const starts = (list) => list.map(run => run.run_start);
+
+    it('OR keeps runs with any selected value, None matches runs without the key', () => {
+        expect(starts(apply_custom_filter_dimension(cfRuns, 'env', new Set(['prod', 'None']), 'OR'))).toEqual(['1', '3']);
+    });
+
+    it('NOT keeps runs with none of the selected values', () => {
+        expect(starts(apply_custom_filter_dimension(cfRuns, 'env', new Set(['prod']), 'NOT'))).toEqual(['2', '3']);
+    });
+
+    it('AND keeps runs that have every selected value', () => {
+        expect(starts(apply_custom_filter_dimension(cfRuns, 'env', new Set(['prod']), 'AND'))).toEqual(['1']);
+        // a run holds one value per key, so two values can never both match
+        expect(apply_custom_filter_dimension(cfRuns, 'env', new Set(['prod', 'staging']), 'AND')).toEqual([]);
+        expect(starts(apply_custom_filter_dimension(cfRuns, 'env', new Set(['None']), 'AND'))).toEqual(['3']);
+    });
+});
+
+describe('build_date_range', () => {
+    it('includes the whole "to" minute, so a run in its last seconds is not dropped', () => {
+        const range = build_date_range('2026-08-17', '02:15', '2026-08-17', '02:15');
+        const runsInMinute = [{ run_start: '2026-08-17 02:15:00' }, { run_start: '2026-08-17 02:15:12' }, { run_start: '2026-08-17 02:16:00' }];
+        expect(apply_date_filter(runsInMinute, range.from, range.to).map(run => run.run_start))
+            .toEqual(['2026-08-17 02:15:00', '2026-08-17 02:15:12']);
+    });
+
+    it('rejects a range whose start is after its end and an incomplete range', () => {
+        expect(build_date_range('2026-08-17', '02:16', '2026-08-17', '02:15')).toBeNull();
+        expect(build_date_range('2026-08-17', '', '2026-08-17', '02:15')).toBeNull();
     });
 });

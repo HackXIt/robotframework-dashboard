@@ -3,20 +3,17 @@ import { settings } from "../variables/settings.js";
 import {
     create_overview_latest_graphs,
     create_overview_total_graphs,
-    update_donut_charts,
     update_grouped_data_for_filter
 } from "./overview.js";
 import {
     create_run_statistics_graph,
     create_run_donut_graph,
     create_run_donut_total_graph,
-    create_run_stat_widgets,
     create_run_duration_graph,
     create_run_heatmap_graph,
     update_run_statistics_graph,
     update_run_donut_graph,
     update_run_donut_total_graph,
-    update_run_stat_widgets,
     update_run_duration_graph,
     update_run_heatmap_graph
 } from "./run.js";
@@ -27,14 +24,12 @@ import {
     create_suite_duration_graph,
     create_suite_most_failed_graph,
     create_suite_most_time_consuming_graph,
-    create_suite_stat_widgets,
     update_suite_statistics_graph,
     update_suite_folder_donut_graph,
     update_suite_folder_fail_donut_graph,
     update_suite_duration_graph,
     update_suite_most_failed_graph,
     update_suite_most_time_consuming_graph,
-    update_suite_stat_widgets,
 } from "./suite.js";
 import {
     create_test_statistics_graph,
@@ -46,7 +41,6 @@ import {
     create_test_most_failed_graph,
     create_test_recent_most_failed_graph,
     create_test_most_time_consuming_graph,
-    create_test_stat_widgets,
     update_test_statistics_graph,
     update_test_duration_graph,
     update_test_duration_deviation_graph,
@@ -56,7 +50,6 @@ import {
     update_test_most_failed_graph,
     update_test_recent_most_failed_graph,
     update_test_most_time_consuming_graph,
-    update_test_stat_widgets,
 } from "./test.js";
 import {
     create_keyword_statistics_graph,
@@ -69,7 +62,6 @@ import {
     create_keyword_most_time_consuming_graph,
     create_keyword_most_used_graph,
     create_keyword_exceptions_graph,
-    create_keyword_stat_widgets,
     update_keyword_statistics_graph,
     update_keyword_times_run_graph,
     update_keyword_total_duration_graph,
@@ -80,7 +72,6 @@ import {
     update_keyword_most_time_consuming_graph,
     update_keyword_most_used_graph,
     update_keyword_exceptions_graph,
-    update_keyword_stat_widgets,
 } from "./keyword.js";
 import {
     create_compare_statistics_graph,
@@ -102,7 +93,9 @@ import {
     update_keyword_table,
     update_exception_table
 } from "./tables.js";
+import { create_test_notes_graph, update_test_notes_graph } from "./notes.js";
 import { update_custom_stat_widgets } from "../statwidgets.js";
+import { create_custom_graphs, update_custom_graphs } from "../customgraphs/widgets.js";
 
 // function that creates all graphs from scratch - used on first load of each tab
 function create_dashboard_graphs() {
@@ -110,12 +103,10 @@ function create_dashboard_graphs() {
         update_grouped_data_for_filter();
         create_overview_latest_graphs();
         create_overview_total_graphs();
-        update_donut_charts();
     } else if (settings.menu.dashboard) {
         create_run_statistics_graph();
         create_run_donut_graph();
         create_run_donut_total_graph();
-        create_run_stat_widgets();
         create_run_duration_graph();
         create_run_heatmap_graph();
         create_suite_statistics_graph();
@@ -124,7 +115,6 @@ function create_dashboard_graphs() {
         create_suite_duration_graph();
         create_suite_most_failed_graph();
         create_suite_most_time_consuming_graph();
-        create_suite_stat_widgets();
         create_test_statistics_graph();
         create_test_duration_graph();
         create_test_duration_deviation_graph();
@@ -134,7 +124,7 @@ function create_dashboard_graphs() {
         create_test_most_failed_graph();
         create_test_recent_most_failed_graph();
         create_test_most_time_consuming_graph();
-        create_test_stat_widgets();
+        create_test_notes_graph();
         create_keyword_statistics_graph();
         create_keyword_times_run_graph();
         create_keyword_total_duration_graph();
@@ -145,8 +135,8 @@ function create_dashboard_graphs() {
         create_keyword_most_time_consuming_graph();
         create_keyword_most_used_graph();
         create_keyword_exceptions_graph();
-        create_keyword_stat_widgets();
         update_custom_stat_widgets();
+        create_custom_graphs();
     } else if (settings.menu.compare) {
         create_compare_statistics_graph();
         create_compare_suite_duration_graph();
@@ -167,12 +157,10 @@ function update_dashboard_graphs() {
         update_grouped_data_for_filter();
         create_overview_latest_graphs();
         create_overview_total_graphs();
-        update_donut_charts();
     } else if (settings.menu.dashboard) {
         update_run_statistics_graph();
         update_run_donut_graph();
         update_run_donut_total_graph();
-        update_run_stat_widgets();
         update_run_duration_graph();
         update_run_heatmap_graph();
         update_suite_statistics_graph();
@@ -181,7 +169,6 @@ function update_dashboard_graphs() {
         update_suite_duration_graph();
         update_suite_most_failed_graph();
         update_suite_most_time_consuming_graph();
-        update_suite_stat_widgets();
         update_test_statistics_graph();
         update_test_duration_graph();
         update_test_duration_deviation_graph();
@@ -191,7 +178,7 @@ function update_dashboard_graphs() {
         update_test_most_failed_graph();
         update_test_recent_most_failed_graph();
         update_test_most_time_consuming_graph();
-        update_test_stat_widgets();
+        update_test_notes_graph();
         update_keyword_statistics_graph();
         update_keyword_times_run_graph();
         update_keyword_total_duration_graph();
@@ -202,8 +189,8 @@ function update_dashboard_graphs() {
         update_keyword_most_time_consuming_graph();
         update_keyword_most_used_graph();
         update_keyword_exceptions_graph();
-        update_keyword_stat_widgets();
         update_custom_stat_widgets();
+        update_custom_graphs();
     } else if (settings.menu.compare) {
         update_compare_statistics_graph();
         update_compare_suite_duration_graph();
@@ -217,13 +204,8 @@ function update_dashboard_graphs() {
     }
 }
 
-// backward-compatible alias - always creates from scratch
-function setup_dashboard_graphs() {
-    create_dashboard_graphs();
-}
 
 export {
-    setup_dashboard_graphs,
     create_dashboard_graphs,
     update_dashboard_graphs
 };

@@ -1,6 +1,6 @@
 ---
 name: testing
-description: Run, add, debug, or fix tests of any tier — Robot Framework acceptance tests (tests/robot/, Playwright screenshots, pabot, Docker), Python unit tests (tests/python/, pytest), or JavaScript unit tests (tests/javascript/, Vitest). Use whenever the task mentions tests, test failures, CI being red, reference screenshots, or verifying a change end-to-end.
+description: Run, add, debug or fix Robot (Docker, Playwright screenshots, pabot), Python (pytest) or JS (Vitest) tests. Use whenever a task mentions tests, test failures, red CI, reference screenshots, or end-to-end verification.
 ---
 
 # Testing
@@ -95,7 +95,7 @@ gh run download <run-id> -n robot-results -D robot-results
 `gh run download` yields `robot-results/output.xml`, `log.html`, and `robot-results/browser/screenshot/*.png`. Then:
 
 - Run the diagnosis script from [robot-tests.md](robot-tests.md) — it picks up `robot-results*/output.xml` automatically and classifies each failure (stale screenshot / element not visible / other).
-- Stale screenshot and the new rendering is correct → copy `robot-results/browser/screenshot/<name>.png` over the reference in `tests/robot/resources/dashboard_output/<folder>/`. CI screenshots are Linux-rendered, so they are valid references (unlike anything captured on a Windows host).
+- Stale screenshot and the new rendering is correct → copy `robot-results/browser/screenshot/<name>.png` over the reference `tests/robot/resources/dashboard_output/<name>.png`. CI screenshots are Linux-rendered, so they are valid references (unlike anything captured on a Windows host).
 - Anything else → reproduce in Docker with the single suite/test, fix, re-run.
 - Python/JS unit failures: reproduce with the project script locally; the `--log-failed` output already contains the pytest/vitest assertion.
 

@@ -1,0 +1,1347 @@
+{
+  "compareStatisticsGraph": {
+    "datasets": [
+      {
+        "data": [
+          45,
+          5,
+          0
+        ],
+        "label": "2026-09-10 06:00:11"
+      },
+      {
+        "data": [
+          94,
+          11,
+          0
+        ],
+        "label": "2026-09-09 02:15:36"
+      }
+    ],
+    "labels": [
+      "Passed",
+      "Failed",
+      "Skipped"
+    ]
+  },
+  "compareSuiteDurationGraph": {
+    "datasets": [
+      {
+        "data": [
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          12.477,
+          40.067,
+          15.451,
+          21.507,
+          16.649
+        ],
+        "label": "2026-09-10 06:00:11"
+      },
+      {
+        "data": [
+          99.896,
+          103.409,
+          127.769,
+          77.384,
+          113.411,
+          105.656,
+          107.986,
+          190.888,
+          107.12,
+          173.407,
+          109.6,
+          null,
+          null,
+          null,
+          null,
+          null
+        ],
+        "label": "2026-09-09 02:15:36"
+      }
+    ],
+    "labels": [
+      "Account Orders History",
+      "Account Profile",
+      "Cart",
+      "Cart Wishlist",
+      "Catalog Filters",
+      "Catalog Product Details",
+      "Catalog Search",
+      "Checkout",
+      "Checkout Gift Cards",
+      "Checkout Payment",
+      "Login",
+      "Auth Tokens",
+      "Orders",
+      "Orders Customers",
+      "Products",
+      "Products Inventory"
+    ]
+  },
+  "compareTestsGraph": {
+    "datasets": [
+      {
+        "data": [
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Order History Shows Recent Orders"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Order History Filter By Status"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Order Details Page"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Reorder From History"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Track Shipment"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Update Profile Name"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Update Profile Email Requires Verification"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Change Password"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Change Password With Wrong Current Password"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Add Shipping Address"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Delete Shipping Address"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Set Default Address"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Delete Account"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Add Product To Cart"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Add Multiple Products To Cart"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Remove Product From Cart"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Update Quantity In Cart"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Cart Shows Correct Total"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Cart Empty State"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Cart Apply Discount Code"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Cart Invalid Discount Code"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Cart Free Shipping Threshold"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Cart Merge After Login"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Add Product To Wishlist"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Remove Product From Wishlist"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Move Wishlist Item To Cart"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Wishlist Requires Login"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Share Wishlist Link"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Wishlist Persists Between Sessions"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Filter By Category"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Filter By Price Range"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Filter By Brand"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Filter Combination Category And Price"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Clear All Filters"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Sort By Price Ascending"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Sort By Price Descending"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Product Page Shows Price And Stock"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Product Page Shows Reviews"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Product Page Related Products"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Product Page Out Of Stock Notice"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Product Page Size Selector"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Product Page Add Review Requires Login"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Product Page Breadcrumbs"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Product Page Specifications Tab"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Search Laptop"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Search Headphones"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Search Coffee Machine"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Search Running Shoes"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Search Smartphone"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Search Backpack"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Search Desk Lamp"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Search Board Game"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Search Winter Jacket"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Search Monitor"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Search Gaming Mouse"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Search Bluetooth Speaker"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Search With No Results Shows Suggestion"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Search Special Characters"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Search Persists After Navigation"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Checkout As Guest"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Checkout As Registered Customer"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Checkout Shipping Address Validation"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Checkout Select Express Shipping"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Checkout Select Pickup Point"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Checkout Change Billing Address"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Checkout Order Summary Matches Cart"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Checkout Back To Cart Keeps Items"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Checkout Terms Must Be Accepted"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Checkout With Empty Cart Redirects"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Checkout Order Appears In History"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Apply Gift Card At Checkout"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Apply Gift Card With Insufficient Balance"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Apply Expired Gift Card"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Combine Gift Card And Discount Code"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Buy Gift Card"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Pay With Credit Card"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Pay With Paypal"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Pay With Expired Card Shows Error"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Pay With Declined Card Shows Error"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Pay With Invalid Cvc"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Payment Retry After Gateway Timeout"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Payment Three D Secure Flow"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Login With Valid Credentials"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Login With Invalid Password Shows Error"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Login With Unknown Email Shows Error"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Login With Empty Form Shows Validation"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Login Remember Me Keeps Session"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Logout Returns To Homepage"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Login Locks Account After Five Attempts"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Login Redirects To Requested Page"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Password Reset Sends Email"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Password Reset With Unknown Email"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Login With Retry On Connection Error"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Login Form Is Accessible By Keyboard"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Obtain Token With Valid Credentials"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Obtain Token With Invalid Credentials"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Refresh Token"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Refresh Expired Token"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Revoke Token"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Token Scopes Restrict Access"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Access Without Token Returns 401"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Create Order"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Create Order With Retry"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Create Order With Empty Cart Returns 400"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Get Order By Id"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "List Orders For Customer"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Cancel Order"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Cancel Shipped Order Returns 409"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Update Shipping Address On Order"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Order Status Transitions"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Order Total Includes Tax"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Order With Discount Code"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Order Pagination"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Order Webhook Delivered"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Create Customer"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Get Customer Profile"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Update Customer Email"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Delete Customer Gdpr"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Customer Address Book"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Customer Search By Email"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Customer Newsletter Preferences"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "List Electronics"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "List Books"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "List Clothing"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "List Toys"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "List Garden"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "List Sports"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Get Product By Id"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Get Unknown Product Returns 404"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Create Product Requires Admin"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Update Product Price"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Delete Product"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Product Search Endpoint"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Stock Level For Product"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Stock Decreases After Order"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Stock Update Requires Admin"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Low Stock Webhook"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Reserve Stock For Cart"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Release Reserved Stock"
+          }
+        ],
+        "label": null
+      },
+      {
+        "data": [
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Download Invoice"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Cart Persists After Reload"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Cart Quantity Limit Per Product"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Filter By Rating"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Sort By Newest"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Filter Results Pagination"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Product Page Image Gallery"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Product Page Share Buttons"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Search Autocomplete Shows Suggestions"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Checkout Order Confirmation Email"
+          },
+          {
+            "x": [
+              0,
+              1
+            ],
+            "y": "Pay With Ideal"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Token Rate Limit"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Order Export Csv"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Customer Merge Duplicates"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Bulk Stock Import"
+          },
+          {
+            "x": [
+              1,
+              2
+            ],
+            "y": "Inventory Report Export"
+          }
+        ],
+        "label": null
+      }
+    ],
+    "labels": [
+      "Order History Shows Recent Orders",
+      "Order History Filter By Status",
+      "Order Details Page",
+      "Reorder From History",
+      "Download Invoice",
+      "Track Shipment",
+      "Update Profile Name",
+      "Update Profile Email Requires Verification",
+      "Change Password",
+      "Change Password With Wrong Current Password",
+      "Add Shipping Address",
+      "Delete Shipping Address",
+      "Set Default Address",
+      "Delete Account",
+      "Add Product To Cart",
+      "Add Multiple Products To Cart",
+      "Remove Product From Cart",
+      "Update Quantity In Cart",
+      "Cart Persists After Reload",
+      "Cart Shows Correct Total",
+      "Cart Empty State",
+      "Cart Apply Discount Code",
+      "Cart Invalid Discount Code",
+      "Cart Free Shipping Threshold",
+      "Cart Quantity Limit Per Product",
+      "Cart Merge After Login",
+      "Add Product To Wishlist",
+      "Remove Product From Wishlist",
+      "Move Wishlist Item To Cart",
+      "Wishlist Requires Login",
+      "Share Wishlist Link",
+      "Wishlist Persists Between Sessions",
+      "Filter By Category",
+      "Filter By Price Range",
+      "Filter By Brand",
+      "Filter By Rating",
+      "Filter Combination Category And Price",
+      "Clear All Filters",
+      "Sort By Price Ascending",
+      "Sort By Price Descending",
+      "Sort By Newest",
+      "Filter Results Pagination",
+      "Product Page Shows Price And Stock",
+      "Product Page Image Gallery",
+      "Product Page Shows Reviews",
+      "Product Page Related Products",
+      "Product Page Out Of Stock Notice",
+      "Product Page Size Selector",
+      "Product Page Add Review Requires Login",
+      "Product Page Share Buttons",
+      "Product Page Breadcrumbs",
+      "Product Page Specifications Tab",
+      "Search Laptop",
+      "Search Headphones",
+      "Search Coffee Machine",
+      "Search Running Shoes",
+      "Search Smartphone",
+      "Search Backpack",
+      "Search Desk Lamp",
+      "Search Board Game",
+      "Search Winter Jacket",
+      "Search Monitor",
+      "Search Gaming Mouse",
+      "Search Bluetooth Speaker",
+      "Search With No Results Shows Suggestion",
+      "Search Autocomplete Shows Suggestions",
+      "Search Special Characters",
+      "Search Persists After Navigation",
+      "Checkout As Guest",
+      "Checkout As Registered Customer",
+      "Checkout Shipping Address Validation",
+      "Checkout Select Express Shipping",
+      "Checkout Select Pickup Point",
+      "Checkout Change Billing Address",
+      "Checkout Order Summary Matches Cart",
+      "Checkout Back To Cart Keeps Items",
+      "Checkout Terms Must Be Accepted",
+      "Checkout With Empty Cart Redirects",
+      "Checkout Order Confirmation Email",
+      "Checkout Order Appears In History",
+      "Apply Gift Card At Checkout",
+      "Apply Gift Card With Insufficient Balance",
+      "Apply Expired Gift Card",
+      "Combine Gift Card And Discount Code",
+      "Buy Gift Card",
+      "Pay With Credit Card",
+      "Pay With Paypal",
+      "Pay With Ideal",
+      "Pay With Expired Card Shows Error",
+      "Pay With Declined Card Shows Error",
+      "Pay With Invalid Cvc",
+      "Payment Retry After Gateway Timeout",
+      "Payment Three D Secure Flow",
+      "Login With Valid Credentials",
+      "Login With Invalid Password Shows Error",
+      "Login With Unknown Email Shows Error",
+      "Login With Empty Form Shows Validation",
+      "Login Remember Me Keeps Session",
+      "Logout Returns To Homepage",
+      "Login Locks Account After Five Attempts",
+      "Login Redirects To Requested Page",
+      "Password Reset Sends Email",
+      "Password Reset With Unknown Email",
+      "Login With Retry On Connection Error",
+      "Login Form Is Accessible By Keyboard",
+      "Obtain Token With Valid Credentials",
+      "Obtain Token With Invalid Credentials",
+      "Refresh Token",
+      "Refresh Expired Token",
+      "Revoke Token",
+      "Token Rate Limit",
+      "Token Scopes Restrict Access",
+      "Access Without Token Returns 401",
+      "Create Order",
+      "Create Order With Retry",
+      "Create Order With Empty Cart Returns 400",
+      "Get Order By Id",
+      "List Orders For Customer",
+      "Cancel Order",
+      "Cancel Shipped Order Returns 409",
+      "Update Shipping Address On Order",
+      "Order Status Transitions",
+      "Order Total Includes Tax",
+      "Order With Discount Code",
+      "Order Pagination",
+      "Order Webhook Delivered",
+      "Order Export Csv",
+      "Create Customer",
+      "Get Customer Profile",
+      "Update Customer Email",
+      "Delete Customer Gdpr",
+      "Customer Address Book",
+      "Customer Search By Email",
+      "Customer Merge Duplicates",
+      "Customer Newsletter Preferences",
+      "List Electronics",
+      "List Books",
+      "List Clothing",
+      "List Toys",
+      "List Garden",
+      "List Sports",
+      "Get Product By Id",
+      "Get Unknown Product Returns 404",
+      "Create Product Requires Admin",
+      "Update Product Price",
+      "Delete Product",
+      "Product Search Endpoint",
+      "Stock Level For Product",
+      "Stock Decreases After Order",
+      "Stock Update Requires Admin",
+      "Low Stock Webhook",
+      "Bulk Stock Import",
+      "Inventory Report Export",
+      "Reserve Stock For Cart",
+      "Release Reserved Stock"
+    ]
+  }
+}

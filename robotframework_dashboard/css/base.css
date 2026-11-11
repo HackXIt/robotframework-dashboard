@@ -129,6 +129,12 @@ body {
 .add-stat-widget-header:hover svg,
 .add-link-widget-header:hover svg,
 .add-section-header:hover svg,
+.add-custom-graph-header:hover svg,
+.edit-custom-graph:hover svg,
+.duplicate-custom-graph:hover svg,
+.delete-custom-graph:hover svg,
+.data-custom-graph:hover svg,
+.copy-custom-graph:hover svg,
 .delete-custom-stat-widget:hover svg,
 .delete-custom-link-widget:hover svg,
 .delete-custom-section:hover svg,
@@ -178,6 +184,12 @@ html:has(body.modal-open) {
   scrollbar-gutter: stable;
 }
 
+/* Bootstrap's overflow:hidden on <body> would make the body a scroll container, so the sticky navbar
+   stops pinning to the viewport and jumps up by the current scroll offset. The lock on <html> is enough. */
+body.modal-open {
+  overflow: visible !important;
+}
+
 h4,
 h5,
 h6 {
@@ -210,6 +222,12 @@ body.lock-scroll {
 .add-stat-widget-header,
 .add-link-widget-header,
 .add-section-header,
+.add-custom-graph-header,
+.edit-custom-graph,
+.duplicate-custom-graph,
+.delete-custom-graph,
+.data-custom-graph,
+.copy-custom-graph,
 .delete-custom-stat-widget,
 .delete-custom-link-widget,
 .delete-custom-section,

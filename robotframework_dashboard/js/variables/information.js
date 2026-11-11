@@ -9,6 +9,11 @@ const informationMap = {
     "themeLight": "Theme",
     "themeDark": "Theme",
     "database": "Database Summary",
+    "notes": "Notes",
+    "settingNotes": "Add your own notes and categories to test results. Enables the Notes button in the menu bar, the right-click menu on test graphs, the Test Notes widget in the Test section and the note column of the Test table. Notes are stored in this browser only.",
+    "testNotesInformation": `Failed tests and tests with a note of the filtered runs.
+- Click the pencil to add or edit a note, or right-click a test in a test graph.
+- Notes and categories are stored in this browser only, manage them with the Notes button in the menu bar.`,
     "versionInformation": '"placeholder_version"',
     "bug": "Report a bug or request a feature",
     "github": "Github",
@@ -226,24 +231,21 @@ Tip: avoid using Status and Only Changes together — the result will be empty.`
     "settingCustomLogo": "Upload a PNG to replace the Robot Framework logo in the nav bar. Also used as the browser favicon. Click Reset to restore the default.",
 };
 
+// the views that set a note target in notes/chart_notes.js
+[
+    "testStatisticsGraphTimeline", "testStatisticsGraphLine", "testMostFlakyGraphTimeline", "testRecentMostFlakyGraphTimeline",
+    "testMostFailedGraphTimeline", "testRecentMostFailedGraphTimeline", "compareTestsGraphTimeline",
+].forEach(id => { informationMap[id] += "\n- With Test Notes enabled in the settings: right-click a test to add or edit its note."; });
+
 // Generate standard control entries for all graphs
 const graphKeys = [
     "runStatistics", "runDonut", "runDuration", "runHeatmap",
-    "runStatExecutedRuns", "runStatExecutedSuites", "runStatExecutedTests", "runStatExecutedKeywords",
-    "runStatUniqueTests", "runStatPassed", "runStatFailed", "runStatSkipped",
-    "runStatTotalTime", "runStatAvgRunTime", "runStatAvgTestTime", "runStatAvgPassRate",
     "suiteFolderDonut", "suiteStatistics", "suiteDuration", "suiteMostFailed", "suiteMostTimeConsuming",
-    "suiteStatExecuted", "suiteStatUnique", "suiteStatPassed", "suiteStatFailed",
-    "suiteStatSkipped", "suiteStatPassRate", "suiteStatTotalTime", "suiteStatAvgTime",
     "testStatistics", "testDuration", "testDurationDeviation", "testMessages",
-    "testMostFlaky", "testRecentMostFlaky", "testMostFailed", "testRecentMostFailed", "testMostTimeConsuming",
-    "testStatExecuted", "testStatUnique", "testStatPassed", "testStatFailed",
-    "testStatSkipped", "testStatPassRate", "testStatTotalTime", "testStatAvgTime",
+    "testMostFlaky", "testRecentMostFlaky", "testMostFailed", "testRecentMostFailed", "testMostTimeConsuming", "testNotes",
     "keywordStatistics", "keywordTimesRun", "keywordTotalDuration", "keywordAverageDuration",
     "keywordMinDuration", "keywordMaxDuration", "keywordMostFailed", "keywordMostTimeConsuming", "keywordMostUsed",
     "keywordExceptions",
-    "keywordStatExecutions", "keywordStatUnique", "keywordStatPassed", "keywordStatFailed",
-    "keywordStatTotalTime", "keywordStatAvgTime",
     "compareStatistics", "compareSuiteDuration", "compareTests",
 ];
 graphKeys.forEach(key => {
@@ -272,6 +274,7 @@ graphKeys.forEach(key => {
 ["run", "suite", "test", "keyword", "unified"].forEach(key => {
     informationMap[`${key}AddStatWidgetHeader`] = "Add Stat Widget";
     informationMap[`${key}AddLinkWidgetHeader`] = "Add Link Widget";
+    informationMap[`${key}AddCustomGraphHeader`] = "Add Custom Graph";
 });
 
 informationMap["unifiedAddSectionHeader"] = "Add Custom Section";

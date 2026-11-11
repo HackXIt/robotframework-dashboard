@@ -36,20 +36,35 @@ INSERT_INTO_EXCEPTIONS = """ INSERT INTO exceptions VALUES (?,?,?,?) """
 
 SELECT_FROM_RUNS = """ SELECT * FROM runs """
 SELECT_RUN_STARTS_FROM_RUNS = """ SELECT run_start FROM runs """
+# second parameter: the run_start followed by GLOB_TIMEZONE_OFFSET, matching the same run stored with an offset
+SELECT_RUN_START_EXISTS = """ SELECT 1 FROM runs WHERE run_start = ? OR run_start GLOB ? LIMIT 1 """
+GLOB_TIMEZONE_OFFSET = "[+-][0-9][0-9]:[0-9][0-9]"
 SELECT_RUN_DATA = """ SELECT name, run_start, run_alias, tags, custom_filters FROM runs """
 SELECT_FROM_SUITES = """ SELECT * FROM suites """
 SELECT_FROM_TESTS = """ SELECT * FROM tests """
 SELECT_FROM_KEYWORDS = """ SELECT * FROM keywords """
 SELECT_FROM_EXCEPTIONS = """ SELECT * FROM exceptions """
 
+DELETE_RUN_BY_RUN_START = """ DELETE FROM runs WHERE run_start=? """
+DELETE_SUITES_BY_RUN_START = """ DELETE FROM suites WHERE run_start=? """
+DELETE_TESTS_BY_RUN_START = """ DELETE FROM tests WHERE run_start=? """
+DELETE_KEYWORDS_BY_RUN_START = """ DELETE FROM keywords WHERE run_start=? """
+DELETE_EXCEPTIONS_BY_RUN_START = """ DELETE FROM exceptions WHERE run_start=? """
+
+UPDATE_RUN_PATH_BY_RUN_START = """ UPDATE runs SET path=? WHERE run_start=? """
+
+# Deprecated: .format() versions, only kept so custom database classes built from an older
+# example/database/sqlite3.py keep importing them. Use the parameterized queries above.
 DELETE_FROM_RUNS = """ DELETE FROM runs WHERE run_start="{run_start}" """
 DELETE_FROM_SUITES = """ DELETE FROM suites WHERE run_start="{run_start}" """
 DELETE_FROM_TESTS = """ DELETE FROM tests WHERE run_start="{run_start}" """
 DELETE_FROM_KEYWORDS = """ DELETE FROM keywords WHERE run_start="{run_start}" """
 DELETE_FROM_EXCEPTIONS = """ DELETE FROM exceptions WHERE run_start="{run_start}" """
-
 UPDATE_RUN_PATH = """ UPDATE runs SET path="{path}" WHERE run_start="{run_start}" """
 
 VACUUM_DATABASE = """ VACUUM """
 
 GET_RUN_INFO_BY_RUN_START = """ SELECT * FROM runs WHERE run_start = ? """
+SELECT_SUITES_BY_RUN_START = """ SELECT * FROM suites WHERE run_start = ? """
+SELECT_TESTS_BY_RUN_START = """ SELECT * FROM tests WHERE run_start = ? """
+SELECT_KEYWORDS_BY_RUN_START = """ SELECT * FROM keywords WHERE run_start = ? """

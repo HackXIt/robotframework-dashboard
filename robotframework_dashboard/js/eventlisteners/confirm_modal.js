@@ -1,17 +1,16 @@
 function confirm_action(message = "Are you sure?") {
     return new Promise((resolve) => {
-        const settingsModal = document.getElementById("settingsModal");
-        const filtersModal = document.getElementById("filtersModal");
         const modalEl = document.getElementById("confirmModal");
+        // the modal the confirmation was asked from stays open below it
+        const openModals = [...document.querySelectorAll(".modal.show")].filter(modal => modal !== modalEl);
         const modalBody = document.getElementById("confirmModalMessage");
         const cancelBtn = document.getElementById("confirmCancel");
         const okBtn = document.getElementById("confirmOk");
 
-        settingsModal.classList.add("dimmed");
-        filtersModal.classList.add("dimmed");
+        openModals.forEach(modal => modal.classList.add("dimmed"));
         modalBody.innerHTML = message;
 
-        const modal = new bootstrap.Modal(modalEl);
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
         const onCancel = () => {
             resolve(false);
             modal.hide();
@@ -20,15 +19,16 @@ function confirm_action(message = "Are you sure?") {
             resolve(true);
             modal.hide();
         };
+        // Esc and a click on the backdrop close the modal without a button: that is a cancel
         const onHidden = () => {
+            resolve(false);
             cleanup();
         };
         const cleanup = () => {
             cancelBtn.removeEventListener("click", onCancel);
             okBtn.removeEventListener("click", onConfirm);
             modalEl.removeEventListener("hidden.bs.modal", onHidden);
-            settingsModal.classList.remove("dimmed");
-            filtersModal.classList.remove("dimmed");
+            openModals.forEach(modal => modal.classList.remove("dimmed"));
         };
 
         cancelBtn.addEventListener("click", onCancel);

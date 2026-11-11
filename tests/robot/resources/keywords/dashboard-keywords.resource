@@ -4,6 +4,7 @@ Library    String
 Library    json
 Library    Browser
 Library    DocTest.VisualTest    embed_screenshots=True    screenshot_format=png
+Library    SnapshotLibrary    snapshot_directory=${CURDIR}/../__snapshots__
 Resource    ../variables/variables.resource
 
 
@@ -95,17 +96,72 @@ Open Tables Page
     Wait For Elements State    selector=id=tablesStatisticsSection
 
 Validate Screenshot
-    [Arguments]    ${screenshot}    ${reference}    ${folder}    ${threshold}=${EMPTY}
-    VAR    ${reference}    ${REFERENCE_FOLDER}/${folder}/${reference}.png
+    [Arguments]    ${screenshot}    ${reference}    ${threshold}=${EMPTY}
+    VAR    ${reference}    ${REFERENCE_FOLDER}/${reference}.png
     VAR    ${screenshot}    ${SCREENSHOT_FOLDER}/${screenshot}.png
     IF    "${threshold}"=="${EMPTY}"    VAR    ${threshold}    0.005    # 99.5% accuracy by default
     Compare Images    reference_image=${reference}    candidate_image=${screenshot}    threshold=${threshold}
 
 Validate Component
-    [Arguments]    ${id}    ${name}    ${folder}    ${threshold}=${EMPTY}
+    [Documentation]    Screenshot of one element compared with dashboard_output/<name>.png. Names start
+    ...    with the page they show: overview, dashboard, compare or tables.
+    [Arguments]    ${id}    ${name}    ${threshold}=${EMPTY}
     Wait For Dashboard Idle
     Take Screenshot    filename=${SCREENSHOT_FOLDER}/${name}    selector=id=${id}
-    Validate Screenshot    screenshot=${name}    reference=${name}    folder=${folder}    threshold=${threshold}
+    Validate Screenshot    screenshot=${name}    reference=${name}    threshold=${threshold}
+
+Get Section Graph Data
+    [Documentation]    Labels and dataset values of every Chart.js graph inside a section, keyed by
+    ...    canvas id. Dates are returned as local wall-clock text, so the result does not depend
+    ...    on the browser time zone (runDurationGraph holds Date objects).
+    [Arguments]    ${section}
+    ${data}    Evaluate JavaScript    ${None}
+    ...    () => {
+    ...        const local = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 19).replace('T', ' ');
+    ...        const plain = v => v instanceof Date ? local(v)
+    ...            : Array.isArray(v) ? v.map(plain)
+    ...            : v && typeof v === 'object' ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, plain(x)]))
+    ...            : v;
+    ...        return Object.fromEntries(
+    ...            [...document.querySelectorAll('#${section} canvas')]
+    ...                .map(canvas => [canvas.id, Chart.getChart(canvas)])
+    ...                .filter(([id, chart]) => chart)
+    ...                .map(([id, chart]) => [id, {
+    ...                    labels: plain(chart.data.labels),
+    ...                    datasets: chart.data.datasets.map(d => ({label: d.label ?? null, data: plain(d.data)}))
+    ...                }]));
+    ...    }
+    RETURN    ${data}
+
+Validate Section Data
+    [Documentation]    Data counterpart of Validate Component: compares what the graphs of a section
+    ...    plot with the snapshot resources/__snapshots__/<suite>/<name>.json. Exact, unlike the
+    ...    pixel comparison, and a failure names the changed value. With ``text=True`` the visible
+    ...    text of the section is compared as well (<name>_text.txt), for HTML cards such as the
+    ...    overview. Use it for states that only change the data; keep one Validate Component per
+    ...    section for how it looks.
+    [Arguments]    ${id}    ${name}    ${text}=${False}
+    Wait For Dashboard Idle
+    Wait For Elements State    selector=id=${id}    state=attached
+    ${data}    Get Section Graph Data    ${id}
+    Should Match Snapshot    ${data}    name=${name}    shared=True
+    IF    ${text}
+        ${content}    Browser.Get Text    selector=id=${id}
+        Should Match Snapshot    ${content}    name=${name}_text    shared=True
+    END
+
+Validate Table Data
+    [Documentation]    Compares the rows a DataTable shows on its current page, plus its total row
+    ...    count, with the snapshot resources/__snapshots__/<suite>/<name>.json. The full table
+    ...    content is already covered by the database tests.
+    [Arguments]    ${table}    ${name}
+    Wait For Dashboard Idle
+    ${data}    Evaluate JavaScript    ${None}
+    ...    () => ({
+    ...        total: window['${table}'].rows({search: 'applied'}).count(),
+    ...        rows: window['${table}'].rows({page: 'current'}).data().toArray()
+    ...    })
+    Should Match Snapshot    ${data}    name=${name}    shared=True
 
 Set Test Statistics Rerun View
     [Arguments]    ${view}
@@ -115,7 +171,7 @@ Set Test Statistics Rerun View
 Get Rerun Marked Bar Count
     [Documentation]    Bars in a timeline graph that carry the rerun border (blue, width 3).
     [Arguments]    ${graph}=testStatisticsGraph
-    ${count}    Evaluate JavaScript    ${None}    () => window.${graph}.data.datasets.filter(dataset => dataset.borderWidth === 3).length
+    ${count}    Evaluate JavaScript    ${None}    () => window.${graph}.data.datasets.filter(dataset => dataset.borderWidth === 3).reduce((sum, dataset) => sum + dataset.data.length, 0)
     RETURN    ${count}
 
 Set Compare Tests Rerun View
@@ -127,6 +183,15 @@ Get Test Count With Attempts
     [Documentation]    Tests in the filtered data that carry a rerun attempt history.
     ${count}    Evaluate JavaScript    ${None}    () => filteredTests.filter(test => test.attempts).length
     RETURN    ${count}
+
+Wait For Modal Opened
+    [Documentation]    Waits until the opening animation of the modal ${modal_id} is finished. Bootstrap ignores a
+    ...    hide() that arrives while a modal is still animating open, so a confirm button clicked within
+    ...    that animation (filling a form is faster than the 300 ms fade) leaves the modal on screen.
+    [Arguments]    ${modal_id}
+    Wait For Function
+    ...    () => { const modal = document.getElementById("${modal_id}"); return modal.classList.contains("show") && getComputedStyle(modal).opacity === "1" && !bootstrap.Modal.getInstance(modal)?._isTransitioning; }
+    ...    timeout=10s
 
 Open Filter Dialog
     [Documentation]    Bootstrap ignores a hide() that arrives while the modal is still animating
@@ -448,6 +513,7 @@ Merge Filter Profiles Into
     [Arguments]    ${left}    ${right}    ${new_name}
     Open Filter Dialog
     Click    selector=id=mergeFilterProfiles
+    Wait For Modal Opened    mergeProfilesModal
     Select Options By    id=mergeProfileLeft    value    ${left}
     Select Options By    id=mergeProfileRight    value    ${right}
     Fill Text    selector=id=mergeProfileNewName    txt=${new_name}
@@ -605,6 +671,7 @@ Add Stat Widget
     ...    ${stat} is the statwidgetdefs key, e.g. run.passedRuns.
     [Arguments]    ${section}    ${stat}    ${title}
     Click    selector=id=${section}AddStatWidgetHeader
+    Wait For Modal Opened    addStatWidgetModal
     Select Options By    id=addStatWidgetStat    value    ${stat}
     Fill Text    selector=id=addStatWidgetTitle    txt=${title}
     Click    selector=id=addStatWidgetConfirm
@@ -613,6 +680,7 @@ Add Stat Widget
 Add Link Widget
     [Arguments]    ${section}    ${label}    ${url}
     Click    selector=id=${section}AddLinkWidgetHeader
+    Wait For Modal Opened    addLinkWidgetModal
     Fill Text    selector=id=addLinkWidgetLabel    txt=${label}
     Fill Text    selector=id=addLinkWidgetUrl    txt=${url}
     Click    selector=id=addLinkWidgetConfirm
@@ -623,6 +691,85 @@ Delete First Custom Widget
     [Arguments]    ${type}
     Click    selector=css=.delete-custom-${type}-widget
     Wait For Dashboard Idle
+
+Open Custom Graph Builder
+    [Documentation]    The custom graph "+" in the section header (edit mode only); opens on the gallery tab.
+    [Arguments]    ${section}
+    Click    selector=id=${section}AddCustomGraphHeader
+    Wait For Modal Opened    customGraphModal
+    Wait For Elements State    selector=id=customGraphGallery    state=visible
+
+Pick Custom Graph Preset
+    [Documentation]    ${preset} is the key in customgraphs/presets.js (mostFailed), an empty string starts from scratch.
+    [Arguments]    ${preset}
+    Click    selector=css=.custom-graph-preset[data-preset="${preset}"]
+    Wait For Elements State    selector=id=customGraphForm    state=visible
+
+Save Custom Graph
+    Wait For Elements State    selector=id=customGraphSave    state=enabled
+    Click    selector=id=customGraphSave
+    Wait For Dashboard Idle
+
+Add Custom Graph From Preset
+    [Arguments]    ${section}    ${preset}
+    Open Custom Graph Builder    ${section}
+    Pick Custom Graph Preset    ${preset}
+    Save Custom Graph
+
+Add Custom Graph From JSON
+    [Documentation]    Pastes ${definition} (a graph definition as JSON) in the JSON tab of the builder and saves it.
+    [Arguments]    ${section}    ${definition}
+    Open Custom Graph Builder    ${section}
+    Click    selector=id=customGraphJsonTab-tab
+    Wait For Elements State    selector=id=customGraphJson    state=visible
+    Fill Text    selector=id=customGraphJson    txt=${definition}
+    Save Custom Graph
+
+Edit First Custom Graph
+    [Documentation]    The pencil on the first custom graph tile of ${grid} (edit mode only); opens on the builder tab.
+    [Arguments]    ${grid}
+    Click    selector=css=#${grid} .edit-custom-graph >> nth=0
+    Wait For Elements State    selector=id=customGraphForm    state=visible
+
+Set Custom Graph X Axis
+    [Arguments]    ${field}
+    Select Options By    id=customGraphX    value    ${field}
+
+Set Custom Graph Chart Type
+    [Documentation]    ${type} is a viz key from customgraphs/spec.js: line, bar, stacked_bar, hbar, donut or table.
+    [Arguments]    ${type}
+    Click    selector=css=.custom-graph-viz-btn[data-viz="${type}"]
+
+Follow Section Filters In Custom Graph Builder
+    [Documentation]    The switch is only offered in the suite, test and keyword sections.
+    Check Checkbox    selector=id=customGraphSectionFilters
+
+Open First Custom Graph In Fullscreen
+    [Documentation]    Fullscreen redraws the chart in a setTimeout, so this waits for the redrawn chart
+    ...    instead of the idle hook.
+    [Arguments]    ${grid}
+    Click    selector=css=#${grid} .custom-graph-controls .fullscreen-graph >> nth=0
+    Wait For Elements State    selector=css=#${grid} .grid-stack-item-content.fullscreen canvas    state=visible
+    Wait For Function    () => Chart.getChart(document.querySelector("#${grid} .grid-stack-item-content.fullscreen canvas")) !== undefined
+
+Close Custom Graph Fullscreen With Escape
+    Keyboard Key    press    Escape
+    Wait For Elements State    selector=css=.grid-stack-item-content.fullscreen    state=detached
+    Wait For Dashboard Idle
+
+Delete First Custom Graph
+    [Arguments]    ${grid}
+    Click    selector=css=#${grid} .delete-custom-graph >> nth=0
+    Wait For Dashboard Idle
+
+Get Custom Graphs In Grid
+    [Documentation]    [title, x labels, dataset labels, points in the first dataset] of every custom graph tile.
+    ...    Custom graph charts are not kept on window, Chart.getChart finds them through their canvas;
+    ...    a tile that shows a table or a message has no chart and returns empty labels.
+    [Arguments]    ${grid}
+    ${graphs}    Evaluate JavaScript    ${None}
+    ...    () => [...document.querySelectorAll('#${grid} [data-gs-id^="customGraph-"]')].map(el => { const canvas = el.querySelector("canvas"); const chart = canvas ? Chart.getChart(canvas) : null; return [el.querySelector("h6").innerText, chart?.data.labels ?? [], chart ? chart.data.datasets.map(dataset => dataset.label) : [], chart?.data.datasets[0]?.data.length ?? 0]; })
+    RETURN    ${graphs}
 
 Get Stat Widgets In Grid
     [Documentation]    [title, value] of every custom stat widget tile in the grid.
@@ -664,7 +811,7 @@ Select Keyword In Keyword Statistics
     Wait For Dashboard Idle
 
 Get Graph Labels
-    [Documentation]    The x-axis labels of a Chart.js graph (window.<graphId>).
+    [Documentation]    The category labels of a Chart.js graph (window.<graphId>): the x axis, or the rows of a timeline.
     [Arguments]    ${graph}
     ${labels}    Evaluate JavaScript    ${None}    () => window.${graph}.data.labels
     RETURN    ${labels}
@@ -825,6 +972,7 @@ Open Add All Stat Widgets Tab
     ...    waits for the toggle list, which is built on the tab's shown event.
     [Arguments]    ${section}
     Click    selector=id=${section}AddStatWidgetHeader
+    Wait For Modal Opened    addStatWidgetModal
     Click    selector=id=addStatWidgetAllTab-tab
     Wait For Elements State    selector=css=#addAllWidgetsList .add-all-widgets-toggle >> nth=0    state=visible
 
@@ -838,6 +986,7 @@ Add Custom Section
     ...    (edit mode only).
     [Arguments]    ${title}
     Click    selector=id=unifiedAddSectionHeader
+    Wait For Modal Opened    addCustomSectionModal
     Fill Text    selector=id=addCustomSectionTitle    txt=${title}
     Click    selector=id=addCustomSectionConfirm
     Wait For Dashboard Idle
@@ -900,3 +1049,150 @@ Get Expanded Sidebar Sub Items
 
 Toggle Active Sidebar Group
     Click    selector=css=#sidenavBody .sidenav-group-header.active .sidenav-group-toggle
+
+Enable Test Notes
+    [Documentation]    Turns on the opt-in Test Notes setting (settings.show.notes, off by default).
+    Open Settings Tab    defaults
+    Check Checkbox    id=toggleNotes
+    Close Settings
+
+Disable Test Notes
+    Open Settings Tab    defaults
+    Uncheck Checkbox    id=toggleNotes
+    Close Settings
+
+Right Click Bar In Graph
+    [Documentation]    Right-clicks the first timeline bar of ${status} (failed, passed or skipped) in a graph.
+    ...    Scrolls the graph into view first: a scroll closes the notes menu, so it must be finished before the click.
+    [Arguments]    ${graph}    ${status}=failed
+    Scroll To Element    selector=id=${graph}
+    Wait For Dashboard Idle
+    ${point}    Evaluate JavaScript    ${None}
+    ...    () => {
+    ...        const colors = { failed: 'rgba(206, 62, 1, 0.7)', passed: 'rgba(151, 189, 97, 0.7)', skipped: 'rgba(254, 216, 79, 0.7)' };
+    ...        const canvas = document.getElementById('${graph}');
+    ...        const chart = Chart.getChart(canvas);
+    ...        const rect = canvas.getBoundingClientRect();
+    ...        const index = chart.data.datasets.findIndex(dataset => dataset.backgroundColor === colors['${status}']);
+    ...        const bar = chart.getDatasetMeta(index).data[0].getProps(['x', 'y', 'base'], true);
+    ...        return { x: rect.left + (bar.x + bar.base) / 2, y: rect.top + bar.y };
+    ...    }
+    Mouse Button    click    ${point}[x]    ${point}[y]    button=right
+
+Right Click Empty Area In Graph
+    [Documentation]    Right-clicks the top left corner of a graph canvas, where no bar is drawn.
+    [Arguments]    ${graph}
+    Scroll To Element    selector=id=${graph}
+    Wait For Dashboard Idle
+    ${point}    Evaluate JavaScript    ${None}
+    ...    () => { const rect = document.getElementById('${graph}').getBoundingClientRect(); return { x: rect.left + 3, y: rect.top + 3 }; }
+    Mouse Button    click    ${point}[x]    ${point}[y]    button=right
+
+Note Context Menu Should Offer
+    [Arguments]    @{actions}
+    ${offered}    Evaluate JavaScript    ${None}
+    ...    () => [...document.querySelectorAll('#noteContextMenu [data-note-action]')].map(item => item.textContent)
+    Lists Should Be Equal    ${offered}    ${actions}
+
+Note Context Menu Should Not Be Shown
+    Get Element Count    selector=id=noteContextMenu    assertion_operator===    assertion_expected=0
+
+Choose Note Menu Action
+    [Documentation]    edit, delete or log
+    [Arguments]    ${action}
+    Click    selector=css=#noteContextMenu [data-note-action="${action}"]
+
+Wait For Note Editor
+    Wait For Function
+    ...    () => { const modal = document.getElementById("noteEditorModal"); return modal.classList.contains("show") && getComputedStyle(modal).opacity === "1"; }
+    ...    timeout=5s
+
+Add Category In Note Editor
+    [Arguments]    ${name}
+    Click    selector=id=noteEditorShowNewCategory
+    Fill Text    selector=id=noteEditorNewCategoryName    txt=${name}
+    Click    selector=id=noteEditorAddCategory
+
+Get Note Editor Category Choices
+    [Documentation]    The entries of the category chooser in the note editor as [name, dot color] pairs, "" for no color.
+    ${choices}    Evaluate JavaScript    ${None}
+    ...    () => [...document.querySelectorAll('#noteEditorCategoryMenu [data-category-id]')].map(item => [item.textContent.trim(), item.querySelector('.note-color-dot').style.getPropertyValue('--note-color').trim()])
+    RETURN    ${choices}
+
+Choose Category In Note Editor
+    [Arguments]    ${name}
+    Click    selector=id=noteEditorCategoryButton
+    Click    selector=css=#noteEditorCategoryMenu .dropdown-item >> text="${name}"
+
+Save Note In Editor
+    [Arguments]    ${text}
+    Wait For Note Editor
+    Fill Text    selector=id=noteEditorText    txt=${text}
+    Click    selector=id=noteEditorSave
+    Wait For Elements State    selector=id=noteEditorModal    state=hidden
+    Wait For Dashboard Idle
+
+Get Notes From Local Storage
+    [Documentation]    The stored notes (localStorage key `notes`) as a dictionary.
+    ${notes_str}    LocalStorage Get Item    key=notes
+    ${notes}    Loads    ${notes_str}
+    RETURN    ${notes}
+
+Get Stored Note Texts
+    [Documentation]    The texts of all stored test notes, sorted.
+    ${texts}    Evaluate JavaScript    ${None}
+    ...    () => {
+    ...        const notes = JSON.parse(localStorage.getItem('notes') ?? '{"tests": {}}');
+    ...        return Object.values(notes.tests).flatMap(byTest => Object.values(byTest)).map(note => note.text).sort();
+    ...    }
+    RETURN    ${texts}
+
+Store Notes In Browser
+    [Documentation]    Replaces the stored notes and reloads, as if they were saved in an earlier session.
+    [Arguments]    ${notes}
+    ${notes_str}    Dumps    ${notes}
+    LocalStorage Set Item    key=notes    value=${notes_str}
+    Reload Dashboard
+
+Get Noted Bar Count
+    [Documentation]    Bars in a timeline graph that carry the note border (width 4, the rerun border is 3).
+    [Arguments]    ${graph}=testStatisticsGraph
+    ${count}    Evaluate JavaScript    ${None}    () => window.${graph}.data.datasets.filter(dataset => dataset.borderWidth === 4).reduce((sum, dataset) => sum + dataset.data.length, 0)
+    RETURN    ${count}
+
+Get Test Notes Widget Notes
+    [Documentation]    The note column texts of the Test Notes widget rows that have a note.
+    Scroll To Element    selector=id=testNotesTable
+    ${notes}    Evaluate JavaScript    ${None}
+    ...    () => [...document.querySelectorAll('#testNotesTable .note-cell')].map(cell => cell.textContent.trim()).filter(Boolean)
+    RETURN    ${notes}
+
+Open Notes Modal
+    [Arguments]    ${tab}=notes-list
+    Click    selector=id=notes
+    Wait For Function
+    ...    () => { const modal = document.getElementById("notesModal"); return modal.classList.contains("show") && getComputedStyle(modal).opacity === "1"; }
+    ...    timeout=10s
+    Click    selector=id=${tab}-tab
+
+Import Notes JSON
+    [Documentation]    Waits for the import message, the dashboard is never idle while the notes modal is open.
+    [Arguments]    ${notes}
+    ${notes_str}    Dumps    ${notes}
+    Fill Text    selector=id=importNotesText    txt=${notes_str}
+    Click    selector=id=importNotes
+    Wait For Elements State    selector=css=#alertContainer .alert    state=visible
+
+Download Notes JSON
+    [Documentation]    Clicks the export button and returns the downloaded notes as a dictionary.
+    ${download}    Promise To Wait For Download    saveAs=${ROOT_FOLDER}/results/notes_export_${DASHBOARD_INDEX}.json
+    Click    selector=id=downloadNotes
+    ${file}    Wait For    ${download}
+    ${content}    Get File    ${file}[saveAs]
+    ${notes}    Loads    ${content}
+    RETURN    ${notes}
+
+Fill Browser Storage
+    [Documentation]    Fills localStorage with ${characters} characters of filler under its own key.
+    [Arguments]    ${characters}
+    Evaluate JavaScript    ${None}    () => localStorage.setItem('filler', 'x'.repeat(${characters}))

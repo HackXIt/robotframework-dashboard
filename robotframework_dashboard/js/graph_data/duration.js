@@ -2,45 +2,20 @@ import { settings, get_run_label } from "../variables/settings.js";
 import { inFullscreen, inFullscreenGraph } from "../variables/globals.js";
 import { barConfig, lineConfig } from "../variables/chartconfig.js";
 import { compareRunIds } from "../variables/graphs.js";
-import { get_suite_data_exclusion } from "./helpers.js";
+import { get_suite_data_exclusion, get_keyword_select_key, get_test_section_predicate, get_run_label_by_run_start } from "./helpers.js";
 import { strip_tz_suffix } from "../common.js";
 
 // function to prepare the data in the correct format for duration graphs
 function get_duration_graph_data(dataType, graphType, objectDataAttribute, filteredData) {
     const suiteSelectSuitesCombined = document.getElementById("suiteSelectSuites").value === "All Suites Combined";
-    const suiteSelectTests = document.getElementById("suiteSelectTests").value;
-    const testSelect = document.getElementById("testSelect").value;
-    const testTagsSelect = document.getElementById("testTagsSelect").value;
     const keywordSelect = document.getElementById("keywordSelect").value;
-    const useLibraryNames = settings?.switch?.useLibraryNames === true;
     const limit = inFullscreen && inFullscreenGraph.includes("Duration") ? 100 : 30;
     const exclude_from_suite_data = get_suite_data_exclusion(dataType);
+    const matches_test_section = dataType === "test" ? get_test_section_predicate() : null;
     const should_include = (value) => {
-        if (dataType === "keyword") {
-            const keywordKey = useLibraryNames && value.owner
-                ? `${value.owner}.${value.name}`
-                : value.name;
-
-            if (keywordKey !== keywordSelect) return false;
-        }
+        if (dataType === "keyword" && get_keyword_select_key(value) !== keywordSelect) return false;
         if (exclude_from_suite_data(value)) return false;
-        if (settings.switch.suitePathsTestSection) {
-            if (dataType === "test" && suiteSelectTests !== "All" &&
-                value.full_name !== `${suiteSelectTests}.${value.name}`) {
-                return false;
-            }
-        } else {
-            if (dataType === "test" && suiteSelectTests !== "All" &&
-                !value.full_name.includes(`.${suiteSelectTests}.${value.name}`) &&
-                value.full_name !== `${suiteSelectTests}.${value.name}`) {
-                return false;
-            }
-        }
-        if (dataType === "test" && testSelect !== "All" && value.name !== testSelect) return false;
-        if (dataType === "test" && testTagsSelect !== "All") {
-            const tags = value.tags?.replace(/\[|\]/g, "").split(",").map(t => t.trim()) || [];
-            if (!tags.includes(testTagsSelect)) return false;
-        }
+        if (matches_test_section && !matches_test_section(value)) return false;
         return true;
     };
 
@@ -50,19 +25,22 @@ function get_duration_graph_data(dataType, graphType, objectDataAttribute, filte
             if (!should_include(value)) continue;
             const label = get_run_label(value);
             const duration = Math.round(value[objectDataAttribute] * 100) / 100;
-            entries.push({ label, name: value.name, duration });
+            entries.push({ label, runStart: value.run_start, name: value.name, duration });
         }
         return entries;
     };
 
+    // added up per run, keyed on run_start: runs can share a label
     const combine_entries = (entries) => {
         const map = new Map();
-        for (const { label, duration } of entries) {
-            map.set(label, (map.get(label) || 0) + duration);
+        for (const { label, runStart, duration } of entries) {
+            const total = map.get(runStart) ?? { label, total: 0 };
+            total.total += duration;
+            map.set(runStart, total);
         }
         return Array.from(map.entries())
             .slice(-limit)
-            .map(([label, total]) => [label, Math.round(total * 100) / 100]);
+            .map(([runStart, { label, total }]) => [label, Math.round(total * 100) / 100, runStart]);
     };
 
     const generate_grouped_line_data = (sets) => {
@@ -90,6 +68,7 @@ function get_duration_graph_data(dataType, graphType, objectDataAttribute, filte
             const combined = combine_entries(rawEntries);
             return {
                 labels: combined.map(([label]) => label),
+                runStarts: combined.map(([, , runStart]) => runStart),
                 datasets: [{
                     label: "All Suites Combined",
                     data: combined.map(([, val]) => val),
@@ -98,9 +77,10 @@ function get_duration_graph_data(dataType, graphType, objectDataAttribute, filte
                 }],
             };
         } else {
-            const labels = [], data = new Map();
-            for (const entry of rawEntries.slice(0, limit)) {
+            const labels = [], runStarts = [], data = new Map();
+            for (const entry of rawEntries.slice(-limit)) { // the newest, like the combined view
                 labels.push(entry.label);
+                runStarts.push(entry.runStart);
                 for (const [key, arr] of data.entries()) {
                     arr.push(key === entry.name ? entry.duration : 0);
                 }
@@ -112,6 +92,7 @@ function get_duration_graph_data(dataType, graphType, objectDataAttribute, filte
             }
             return {
                 labels,
+                runStarts,
                 datasets: Array.from(data.entries()).map(([label, dataset]) => ({
                     label: label.slice(0, 40),
                     data: dataset,
@@ -164,26 +145,29 @@ function get_compare_suite_duration_data(filteredData) {
 
     for (const value of filteredData) {
         for (const run of selectedRuns) {
-            if (value.run_start === run || value.run_alias === run || value.run_name === run) {
-                if (settings.switch.suitePathsCompareSection) {
-                    labelSet.add(value.full_name)
-                } else {
-                    labelSet.add(value.name);
-                }
-                if (!dataMap.has(run)) dataMap.set(run, []);
-                dataMap.get(run).push(value.elapsed_s);
+            if (value.run_start === run) {
+                const label = settings.switch.suitePathsCompareSection ? value.full_name : value.name;
+                labelSet.add(label);
+                if (!dataMap.has(run)) dataMap.set(run, new Map());
+                // suites with the same name in different folders share a label, so their durations add up
+                const runData = dataMap.get(run);
+                runData.set(label, (runData.get(label) ?? 0) + Number(value.elapsed_s));
             }
         }
     }
+    // every dataset follows the order of the labels, a suite missing from a run is a gap
+    const labels = [...labelSet];
     for (const run of selectedRuns) {
+        const runData = dataMap.get(run) ?? new Map();
         datasets.push({
-            label: run,
-            data: dataMap.get(run) || [],
+            label: get_run_label_by_run_start(run),
+            runStart: run,
+            data: labels.map(label => runData.get(label) ?? null),
             fill: true
         });
     }
     return {
-        labels: [...labelSet],
+        labels,
         datasets
     };
 }
