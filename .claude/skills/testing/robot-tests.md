@@ -12,8 +12,9 @@ Deep reference for `tests/robot/`. How to run them is in [SKILL.md](SKILL.md) �
 | `robotframework-browser` | Playwright-based browser automation |
 | `robotframework-databaselibrary` | SQLite query assertions |
 | `robotframework-doctestlibrary` | Visual screenshot comparison |
+| `robotframework-snapshot` | Text/data snapshots (`SnapshotLibrary`) for the CLI and database suites |
 
-`scripts/robot-tests.sh` runs pabot with `--pabotlib --testlevelsplit --artifacts png,jpg --artifactsinsubfolders --processes 4 -d results` (`ROBOT_PROCESSES` overrides the process count). `--pabotlib` starts the shared lock server (needed by the index counter below); `--testlevelsplit` parallelises per test case.
+`scripts/robot-tests.sh` runs pabot with `--pabotlib --testlevelsplit --artifacts png,jpg --artifactsinsubfolders --processes 4 -d results` (`ROBOT_PROCESSES` overrides the process count). `--pabotlib` starts the shared lock server (needed by the index counter below); `--testlevelsplit` parallelises per test case. It also passes `--variable SNAPSHOT_STRICT:True` (override with `SNAPSHOT_STRICT=False`), so a missing snapshot fails instead of being recorded, and after a green first pass it runs `python3 -m SnapshotLibrary unused results`, which fails the run when a committed snapshot was not used by any test (see [Text snapshots](#text-snapshots-cli-and-database)).
 
 If any test fails, the script reruns **only the failed tests** once (`--rerunfailed`) and merges both attempts with `rebot --merge`; the exit code is the number of tests still failing. This absorbs transient failures in the container (Playwright browser-launch crash, a dropped keystroke in a date input, a modal still fading). `results/output.xml` / `log.html` are the merged result; `results/first_output.xml` and `results/rerun_output.xml` keep the attempts. A test that is red in the merged log therefore failed **twice** — a real problem, not a flake. When diagnosing, remember the merged run only contains the rerun's screenshots for rerun tests.
 
@@ -23,13 +24,13 @@ If any test fails, the script reruns **only the failed tests** once (`--rerunfai
 
 | Suite | What it tests | Method |
 |---|---|---|
-| `00_cli.robot` | Every CLI flag (short + long form); `--databaseclass` is exercised with `example/database/sqlite3.py`, the reference copy of the built-in class (`--server` is covered by `09_server.robot`, MySQL cannot run in CI) | Runs `robotdashboard` as a subprocess, checks stdout/files against `tests/robot/resources/cli_output/` |
-| `01_database.robot` | SQLite table contents after parsing | Queries the DB via DatabaseLibrary, compares rows against `tests/robot/resources/database_output/` |
-| `02_overview.robot` | Overview page rendering | Screenshot diff vs. reference images |
+| `00_cli.robot` | Every CLI flag (short + long form); `--databaseclass` is exercised with `example/database/sqlite3.py`, the reference copy of the built-in class (`--server` is covered by `09_server.robot`, MySQL cannot run in CI) | Runs `robotdashboard` as a subprocess, checks stdout against snapshots in `tests/robot/resources/__snapshots__/00_cli/` |
+| `01_database.robot` | SQLite table contents after parsing | Queries the DB via DatabaseLibrary, compares rows against snapshots in `tests/robot/resources/__snapshots__/01_database/` |
+| `02_overview.robot` | Overview page rendering | One screenshot per section + data/text snapshots (`Validate Section Data    text=${True}`) for every state |
 | `03_dashboard.robot` | Dashboard tab charts/layout, section filters (suite/test/tag/keyword selects), compare page run selects, suite-path switch, Status + Only Changes filters | Screenshot diff + Chart.js data assertions (`Get Graph Labels`, `Get Graph Dataset Labels`) |
-| `04_compare.robot` | Compare page | Screenshot diff |
-| `05_tables.robot` | Tables page | Screenshot diff |
-| `06_filters.robot` | Filter modal behaviour (run tags AND/OR/NOT, metadata, suite path, reset, `--customfilters` dropdowns), filter profiles | Browser interactions + screenshot diff + DOM assertions; the custom filters test builds its own dashboard (`Generate Dashboard With Custom Filters`) |
+| `04_compare.robot` | Compare page | Screenshot diff + data snapshot |
+| `05_tables.robot` | Tables page | One screenshot (run table) + `Validate Table Data` for every table |
+| `06_filters.robot` | Filter modal behaviour (run tags AND/OR/NOT, metadata, suite path, reset, `--customfilters` dropdowns), filter profiles | Browser interactions + data snapshots (`Validate Section Data`) + DOM assertions; the custom filters test builds its own dashboard (`Generate Dashboard With Custom Filters`) |
 | `07_settings.robot` | Settings modal behaviour | Browser interactions + screenshot diff |
 | `08_layout.robot` | Layout editor: hide/resize/reorder graphs and sections, undo/redo, stat + link widgets, the "All" tab of the stat widget modal, custom section dividers in the unified view | DOM + localStorage assertions, each proven across a `Reload Dashboard` |
 | `09_server.robot` | `--server` mode end to end: REST API, hosted dashboard, log linking, auth, `--noautoupdate`, the packaged listener | One `robotdashboard --server` process per test (`server-keywords.resource`), driven with the Browser `Http` keyword |
@@ -43,14 +44,14 @@ If any test fails, the script reruns **only the failed tests** once (`--rerunfai
 | File | Contents |
 |---|---|
 | `tests/robot/resources/keywords/general-keywords.resource` | `Generate Shared Dashboard` (browser suites), `Get Dashboard Index` + `Generate Dashboard` + `Generate Dashboard With Merged Output` + `Generate Dashboard With Custom Filters` + `Remove Database And Dashboard With Index` (own dashboard per test), `Output Arguments` (the 18 `-o file:tags` arguments) |
-| `tests/robot/resources/keywords/database-keywords.resource` | DB connection helpers, normalisation, row comparison |
+| `tests/robot/resources/keywords/cli-keywords.resource` | `Validate CLI`: runs a command and compares stdout with a shared snapshot; normalizers replace DB names, paths, durations and UTC offsets |
+| `tests/robot/resources/keywords/database-keywords.resource` | DB connection helpers, path normalisation, row snapshot (`timezone` normalizer) |
 | `tests/robot/resources/keywords/dashboard-keywords.resource` | Browser lifecycle (`Open Dashboard`, `Reload Dashboard`, `Wait For Dashboard Idle`), page navigation (`Open Overview Page`, …), filter helpers (`Set Run Filter`, `Set Run Tags Filter`, `Set Run Tags Mode`, `Set Date Filter`, `Set Amount Filter`, `Set Versions Filter`, `Set Metadata Filter`, `Select Suite Path`, `Set Custom Filter`, `Set Custom Filter Mode`), profile helpers (add/apply/delete/update/merge), settings helpers (`Toggle Setting`, `Setting Should Be`, `Apply Settings JSON`, `Reset Settings To Default`), layout editor + widget helpers (`Enter Layout Edit Mode`, `Hide Graph In Layout Editor`, `Add Stat Widget`, `Open Add All Stat Widgets Tab`, `Add Custom Section`, …), section filter helpers (`Select Suite In Suite Statistics`, `Select Compare Run`, `Set Compare Tests Status Filter`, `Get Graph Dataset Labels`, …), `Confirm Action`, `Validate Component`, `Validate Filter Settings`, `Should Show N Of M Runs`, `Change Settings` |
 | `tests/robot/resources/keywords/server-keywords.resource` | `Start Dashboard Server` / `Stop Dashboard Server` (one server process per test on port 8600+index, cwd under `results/`), `Server Request`, `Add Output Via Server`, `Remove Outputs Via Server`, `Add Log Via Server`, `Open Served Dashboard`, `Run Robot With Dashboard Listener` |
 | `tests/robot/resources/listener/listener_suite.robot` | Fixture suite (one passing, one failing test) that `09_server.robot` runs with `--listener robotframework_dashboard.robotdashboardlistener` against the test's server; not collected by the test run |
 | `tests/robot/resources/outputs/` | The 18 `output.xml` + `log.html` fixtures — **generated** by `tests/robot/resources/generator/generate.py` (see its README), never edited by hand. `Generate Dashboard` tags them `prod`/`dev`, `project_1`/`project_2`, `version_1.0`–`1.2` |
-| `tests/robot/resources/cli_output/` | Expected CLI output reference files |
-| `tests/robot/resources/database_output/` | Expected DB row reference files |
-| `tests/robot/resources/dashboard_output/<folder>/<name>.png` | Reference screenshots |
+| `tests/robot/resources/__snapshots__/<suite>/` | Snapshots written by `SnapshotLibrary`: `00_cli/<expected>.txt`, `01_database/<table>.json`, and for the browser suites `<name>.json` (graph data / table rows) and `<name>_text.txt` (section text) |
+| `tests/robot/resources/dashboard_output/<name>.png` | Reference screenshots, one flat folder; names start with the page: `overview…`, `dashboard…`, `compare…`, `tables…` |
 | `tests/robot/resources/test_config.json` | Passed via `-j` by `Generate Shared Dashboard`; disables chart animations (`show.animation: false`) so Chart.js draws synchronously. Add flags for notices/banners here if they ever overlay screenshots |
 
 ### Shared dashboard for browser tests
@@ -69,7 +70,24 @@ When a test needs its **own** database or generated files (`01_database.robot`),
 
 The data is designed to fill every graph: persistent failures, flaky tests, tests broken/fixed at a given run, an outage run per project (`WebshopUI` run 7 on 2026-08-28, `WebshopAPI` run 5) whose failed tests were re-executed with `robot --rerunfailed` and merged with `rebot --merge` (one rerun for `WebshopUI` run 7, two for `WebshopAPI` run 5 — the only runs with an `attempts` history), one all-green run (`WebshopAPI` run 4, 2026-08-25) and one pass+skip-only run (`WebshopAPI` run 6, 2026-09-02), `TRY/EXCEPT` exceptions, feature-flag skips, slow outliers and duration trends. `tests/robot/resources/generator/libraries/profiles.py` says which test does what.
 
-After regenerating fixtures: rerun **all** robot suites in Docker and refresh `cli_output/`, `database_output/` and every reference screenshot.
+After regenerating fixtures: rerun **all** robot suites in Docker and refresh the text snapshots (`REFERENCE_RUN`, see below) and every reference screenshot.
+
+---
+
+## Text and data snapshots
+
+`00_cli`, `01_database` and the data checks of the browser suites (see below) compare against files recorded by [robotframework-snapshot](https://github.com/timdegroot1996/robotframework-snapshot) (`SnapshotLibrary`), stored in `tests/robot/resources/__snapshots__/<suite>/`. Every call uses `shared=True` with `name=<expected>` / `name=<table>`, so the short and long form of a CLI option compare against the same file.
+
+- A mismatch fails with a unified diff in the message and `log.html`.
+- **Update after an intended change** (new flag in `help.txt`, version bump, regenerated fixtures), in Docker:
+  ```bash
+  bash scripts/docker/run-in-robot-container.sh robot --variable REFERENCE_RUN:True --outputdir results tests/robot/testsuites/00_cli.robot
+  ```
+  Review `git diff tests/robot/resources/__snapshots__/` and commit. Never record outside Docker: the `--help` wrapping and keyword-duration rounding differ per Python version.
+- **New snapshot**: run the suite without strict mode (plain `robot`, or `SNAPSHOT_STRICT=False bash scripts/robot-tests.sh`); the missing file is recorded with a warning. `scripts/robot-tests.sh` (CI) is strict and fails on a missing file.
+- **Values that change per run** are replaced before comparing/recording: `duration` and `timezone` built-in normalizers, plus test-scoped custom ones in `Validate CLI` for `.db` names, the `--databaseclass` path, the dashboard directory and the default `robot_dashboard_<TIMESTAMP>.html` name. Add a normalizer there rather than weakening a snapshot by hand.
+- **Removing a test or renaming an `expected=`** leaves an unused file; the `unused` check in `scripts/robot-tests.sh` fails the run. Delete it, or run `python -m SnapshotLibrary unused results --delete` after a full green run.
+- **Renaming or deleting a suite file** leaves its `__snapshots__/<suite>/` folder behind. Because the snapshots live in one central folder (`snapshot_directory` on every `Library    SnapshotLibrary` import) instead of next to each suite, the `unused` check cannot tell that folder is orphaned: move or delete it by hand. Every resource that imports `SnapshotLibrary` must pass `snapshot_directory=${CURDIR}/../__snapshots__`.
 
 ---
 
@@ -78,7 +96,12 @@ After regenerating fixtures: rerun **all** robot suites in Docker and refresh `c
 - Headless Chromium via `robotframework-browser`; `Open Dashboard` opens `robotdashboard_shared.html` over `file://` and hides the relative run-time labels so screenshots stay deterministic.
 - **Never `Sleep` before a screenshot.** `Wait For Dashboard Idle` polls `window.dashboard_is_idle()`, a **test-only** hook that `Open Dashboard` injects from `tests/robot/resources/scripts/dashboard_idle.js` (`Evaluate JavaScript`; the shipped dashboard contains no test code): false while the page spinner, filter overlay, graph overlays, an open/closing modal or backdrop, a `fade_in`/`fade_out` from common.js (`.fading` class) or a Chart.js animation is active, and true only after 50 ms without any of those. `Validate Component` and `Open Dashboard` call it; call it yourself before DOM assertions that follow a filter/settings change. If a new async render path is added to the dashboard (a `setTimeout`, a fade, a new overlay), extend `dashboard_idle.js` rather than sleeping in the tests (unit-tested in `tests/javascript/dashboard_idle.test.js`; the file must start with the arrow function or Browser evaluates it as an expression).
 - Note: the settings UI "animation duration" only scales the stagger delay in `graph_config.js`; Chart.js's default 1000 ms draw still runs. That is why the test config turns animations off instead.
-- `Validate Component    id=<sectionId>    name=<refName>    folder=<refFolder>` takes a screenshot of one element and compares it with `tests/robot/resources/dashboard_output/<refFolder>/<refName>.png` at 99.5 % accuracy by default (`threshold=0.005`); pass `threshold=` to loosen.
+- `Validate Component    id=<sectionId>    name=<refName>` takes a screenshot of one element and compares it with `tests/robot/resources/dashboard_output/<refName>.png` at 99.5 % accuracy by default (`threshold=0.005`); pass `threshold=` to loosen.
+- **Screenshot or data?** Each page section keeps **one** `Validate Component` for its default state: that is what proves colours, legends and layout. Every other state that only changes *what* is plotted (filters, run tags, a second project card, the other tables) uses a data snapshot instead:
+  - `Validate Section Data    id=<sectionId>    name=<name>` snapshots the labels and dataset values of every Chart.js graph in the section (`Get Section Graph Data`, keyed by canvas id; `Date` values become local wall-clock text, so the result is the same in every browser time zone). `text=${True}` also snapshots the section's visible text, for HTML cards such as the overview.
+  - `Validate Table Data    table=<tableId>    name=<name>` snapshots the rows on the DataTable's current page plus its total row count (the full content is covered by `01_database`).
+  - Both are exact (a screenshot at 99.5 % can miss a changed digit), take ~0.05 s instead of ~0.5–1 s, and a failure diff names the graph and value. Kept screenshots get a data snapshot of the same name next to them.
+  - `Browser.Get Text` needs the library prefix: DocTestLibrary also has a `Get Text`.
 - Prefer DOM assertions (`Should Show 8 Of 8 Runs`, `Validate Filter Settings    runTags=project_1`) over screenshots when the behaviour under test is a state, not a rendering — they need no reference image.
 - Anything persisted in localStorage (settings, layouts, widgets, profiles) is asserted with `Get Settings From Local Storage` / `Setting Should Be` and proven with `Reload Dashboard` (a real reload; re-injects the idle hook).
 - Confirm dialogs (`confirm_action`) go through `Confirm Action`: it waits for the fade-in to finish first, because Bootstrap ignores `hide()` while the modal is still transitioning and an early click leaves the dialog open.
@@ -92,9 +115,9 @@ After regenerating fixtures: rerun **all** robot suites in Docker and refresh `c
 
 ## Adding a test
 
-1. **CLI**: two cases in `00_cli.robot` (short + long form), expected output file in `cli_output/`.
-2. **Database**: case in `01_database.robot`, reference row file in `database_output/`.
-3. **Browser**: case in the matching suite; if it uses `Validate Component`, generate the reference screenshot **in Docker** (see below) — screenshots from a Windows host never match.
+1. **CLI**: two cases in `00_cli.robot` (short + long form) with the same `expected=`; record its snapshot in Docker (see Text and data snapshots).
+2. **Database**: case in `01_database.robot`; record its snapshot in Docker.
+3. **Browser**: case in the matching suite; prefer `Validate Section Data` / `Validate Table Data` (recorded like the other snapshots) over a new screenshot. If it needs `Validate Component`, generate the reference screenshot **in Docker** (see below) — screenshots from a Windows host never match.
 4. Run the affected suite in Docker and check the summary line.
 
 ---
@@ -128,9 +151,8 @@ for test in root.iter("test"):
         shot = next((m for m in all_msgs if "browser/screenshot/" in m), "")
         ref = next((m for m in all_msgs if "dashboard_output" in m), "")
         shot_file = shot.split("browser/screenshot/")[-1].split('"')[0].split("'")[0].strip() if shot else "?"
-        ref_path = ref.split("dashboard_output/")[-1].strip() if ref else "?"
-        ref_folder = ref_path.split("/")[0] if "/" in ref_path else "?"
-        print(f"STALE SCREENSHOT [{name}]\n  screenshot : {shot_file}\n  ref folder : tests/robot/resources/dashboard_output/{ref_folder}/")
+        ref_file = ref.split("dashboard_output/")[-1].split('"')[0].split("'")[0].strip() if ref else "?"
+        print(f"STALE SCREENSHOT [{name}]\n  screenshot : {shot_file}\n  reference  : tests/robot/resources/dashboard_output/{ref_file}")
     elif timeout_text:
         el = next((m for m in all_msgs if "locator" in m.lower() or "click" in m.lower()), timeout_text)
         print(f"TIMEOUT / NOT VISIBLE [{name}]\n  {el[:300]}")
@@ -150,7 +172,7 @@ for test in root.iter("test"):
 
 ```bash
 bash scripts/docker/run-in-robot-container.sh robot --outputdir results tests/robot/testsuites/<suite>.robot
-cp results/browser/screenshot/<name>.png tests/robot/resources/dashboard_output/<folder>/<name>.png
+cp results/browser/screenshot/<name>.png tests/robot/resources/dashboard_output/<name>.png
 ```
 
 Screenshots from a downloaded CI artifact (`robot-results (N)/browser/screenshot/`) are also valid sources — the `${reference}` log path starting with `/__w/` confirms a Linux run. **Never** copy a screenshot taken on a Windows host: font rendering differs and it will fail in CI.

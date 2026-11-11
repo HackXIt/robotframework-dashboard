@@ -18,16 +18,20 @@ Test Teardown    Close Dashboard
 
 *** Test Cases ***
 Validate Dashboard Run Statistics
-    Validate Component    id=runStatisticsSection    name=baseRunSection    folder=run
+    Validate Component    id=runStatisticsSection    name=dashboardRunSection
+    Validate Section Data    id=runStatisticsSection    name=dashboardRunSection
 
 Validate Dashboard Suite Statistics
-    Validate Component    id=suiteStatisticsSection    name=baseSuiteSection    folder=suite
+    Validate Component    id=suiteStatisticsSection    name=dashboardSuiteSection
+    Validate Section Data    id=suiteStatisticsSection    name=dashboardSuiteSection
 
 Validate Dashboard Test Statistics
-    Validate Component    id=testStatisticsSection    name=baseTestSection    folder=test
+    Validate Component    id=testStatisticsSection    name=dashboardTestSection
+    Validate Section Data    id=testStatisticsSection    name=dashboardTestSection
 
 Validate Dashboard Keyword Statistics
-    Validate Component    id=keywordStatisticsSection    name=baseKeywordSection    folder=keyword
+    Validate Component    id=keywordStatisticsSection    name=dashboardKeywordSection
+    Validate Section Data    id=keywordStatisticsSection    name=dashboardKeywordSection
 
 Validate Dashboard Test Statistics Rerun View
     [Documentation]    A run merged with `rebot --merge` keeps the attempt history of its tests: the
@@ -82,15 +86,16 @@ Validate Test Statistics Suite And Test Filters
     Should Contain    ${tests}    Login With Valid Credentials
     Should Not Contain    ${tests}    Download Invoice
     Select Test In Test Statistics    Login With Valid Credentials
-    ${datasets}    Get Graph Dataset Labels    testStatisticsGraph
-    Should Be Equal    ${datasets}    ${{ ["Login With Valid Credentials"] }}
+    # the timeline has a dataset per bar style, its rows (labels) are the tests
+    ${rows}    Get Graph Labels    testStatisticsGraph
+    Should Be Equal    ${rows}    ${{ ["Login With Valid Credentials"] }}
     ${datasets}    Get Graph Dataset Labels    testDurationGraph
     Should Be Equal    ${datasets}    ${{ ["Login With Valid Credentials"] }}
 
 Validate Test Statistics Tag Filter
     Select Suite In Test Statistics    All
     Select Test Tag In Test Statistics    smoke
-    ${graph_tests}    Get Graph Dataset Labels    testStatisticsGraph
+    ${graph_tests}    Get Graph Labels    testStatisticsGraph
     ${smoke_tests}    Evaluate JavaScript    ${None}
     ...    () => [...new Set(filteredTests.filter(test => test.tags.includes("smoke")).map(test => test.name))]
     Should Not Be Empty    ${graph_tests}
@@ -214,3 +219,19 @@ The Page Behind An Open Modal Does Not Scroll
     ${after}    Evaluate JavaScript    ${None}
     ...    () => new Promise(res => requestAnimationFrame(() => requestAnimationFrame(() => res(window.scrollY))))
     Should Be Equal    ${before}    ${after}    msg=the page scrolled behind the open modal
+
+Rerun View Change Rebuilds The Test Graphs Once After Page Switches
+    [Documentation]    Every page switch rebuilds the page and runs the setup of the graph controls again. The
+    ...    rerun view select is in the template, so its change listener used to be added again on every
+    ...    switch and one change then rebuilt the test graphs once per switch.
+    FOR    ${_}    IN RANGE    3
+        Open Compare Page
+        Open Dashboard Page
+        Wait For Dashboard Idle
+    END
+    Evaluate JavaScript    ${None}
+    ...    () => { window.rerunViewUpdates = 0; const original = window.update_graphs_with_loading;
+    ...    window.update_graphs_with_loading = (...args) => { window.rerunViewUpdates++; return original(...args); }; }
+    Set Test Statistics Rerun View    final
+    ${updates}    Evaluate JavaScript    ${None}    () => window.rerunViewUpdates
+    Should Be Equal As Integers    ${updates}    1

@@ -49,6 +49,16 @@ Or with a custom host and port plus authentication:
 robotdashboard -s host:port:user:password  
 ```
 
+- The password is everything after the user name, so it may contain `:`. Username and password can only contain ASCII characters.
+- For an IPv6 address, put it in brackets: `robotdashboard -s [::1]:8543:user:password`.
+- To keep the password out of the process list and your shell history, leave the credentials out of `--server` and set the environment variables `ROBOTDASHBOARD_SERVER_USER` and `ROBOTDASHBOARD_SERVER_PASSWORD` instead. They are only used when `--server` has no credentials.
+
+```bash 
+export ROBOTDASHBOARD_SERVER_USER=admin
+export ROBOTDASHBOARD_SERVER_PASSWORD='s3cret:with:colons'
+robotdashboard -s 0.0.0.0:8543
+```
+
 **Enable HTTPS**
 
 To serve over HTTPS, provide paths to your SSL certificate and private key:
@@ -178,7 +188,7 @@ The admin page supports four methods for adding test results:
 | **Remove Log by Name** | Remove a specific log file (e.g., `log-20250219-172535.html`). |
 | **Remove All Logs** | Irreversibly deletes all uploaded log files. |
 
-> **Note:** Reports are not tracked in the database — they're reached through the link Robot Framework builds into the top-right corner of `log.html`, so `/add-log` and `/add-log-file` never need to associate a report with a run directly. Uploading a filename containing `report` (e.g. `report_20250219-172535.html`) via `/add-log-file` is still supported: the file is saved to `robot_logs/` as-is and no database matching is attempted. The response reports `SUCCESS` either way, with the console message noting whether a matching `log` file (same name, `report` replaced by `log`) was found in `robot_logs/` — if not, it's just a warning that the report may not yet be reachable from a log, not an error. See [Log Linking](/log-linking.md#accessing-reports) for naming and placement requirements.
+> **Note:** Reports are not tracked in the database — they're reached through the link Robot Framework builds into the top-right corner of `log.html`, so `/add-log` and `/add-log-file` never need to associate a report with a run directly. Uploading a filename starting with `report` (e.g. `report_20250219-172535.html`) via `/add-log-file` is still supported: the file is saved to `robot_logs/` as-is and no database matching is attempted. The response reports `SUCCESS` either way, with the console message noting whether a matching `log` file (same name, the `report` prefix replaced by `log`) was found in `robot_logs/` — if not, it's just a warning that the report may not yet be reachable from a log, not an error. See [Log Linking](/log-linking.md#accessing-reports) for naming and placement requirements.
 
 ### Database & Log Tables
 
@@ -201,12 +211,14 @@ Beyond the main API endpoints listed above, the server exposes two additional ro
 
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /log?path=<path>` | Serves a stored `log.html` file by its path. Used internally by log linking to render uploaded logs in the browser. |
-| `GET /{full_path:path}` | Catch-all route that serves static resources (screenshots, images, etc.) relative to the last opened log directory. This allows embedded screenshots in log files to display correctly. |
+| `GET /log?path=<path>` | Serves a stored `log.html` file by its path. Used internally by log linking to render uploaded logs in the browser. Only known logs are served: files in `robot_logs/`, or the log next to an output stored in the database (`output-XYZ.xml` ↔ `log-XYZ.html`). Any other path returns a 404. |
+| `GET /{full_path:path}` | Catch-all route that serves static resources (screenshots, images, etc.) relative to the last opened log directory. This allows embedded screenshots in log files to display correctly. Only file types a log can embed or link to are served (images, videos and HTML such as the report); other files and paths outside that directory are rejected. |
 
 ## Gzip Upload Support
 
-Both `/add-output-file` and `/add-log-file` endpoints support gzip-compressed uploads. If the uploaded filename ends with `.gz` or `.gzip`, the server automatically decompresses the file before processing. This is used by the [listener integration](/listener-integration.md) to reduce upload bandwidth.
+File names sent to `/add-output-file`, `/add-log-file`, `/add-log`, `/remove-log` and the `output_alias` of `/add-outputs` must be plain file names: names that contain a folder (for example `../log.html` or `sub/log.html`) are rejected. Uploaded outputs are processed from a temporary folder and never written to the server's working directory.
+
+Both `/add-output-file` and `/add-log-file` endpoints support gzip-compressed uploads. If the uploaded filename ends with `.gz` or `.gzip`, the server automatically decompresses the file before processing. This is used by the [listener integration](/listener-integration.md) to reduce upload bandwidth. A decompressed upload may be at most 1 GiB; a larger one is rejected, so a small upload cannot exhaust the server memory.
 
 ## Manual Refresh Mode (`--noautoupdate`)
 

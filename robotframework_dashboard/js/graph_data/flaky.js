@@ -1,7 +1,8 @@
-import { settings, get_run_label } from "../variables/settings.js";
+import { settings } from "../variables/settings.js";
 import { passedConfig, failedConfig, skippedConfig, rerunBorderColor, rerunBorderWidth } from "../variables/chartconfig.js";
 import { convert_timeline_data, group_timeline_values, parse_test_attempts, resolve_test_status, count_attempt_flips } from "./helpers.js";
 import { strip_tz_suffix } from "../common.js";
+import { get_raw_run_start, get_test_note_marker } from "../notes/store.js";
 
 // function to prepare the data in the correct format for (recent) most flaky test graph
 // with the rerun view of the test section (settings.switch.testRerunView) set to anything but "final",
@@ -60,12 +61,12 @@ function get_most_flaky_data(dataType, graphType, filteredData, ignore, recent, 
 
     if (graphType == "bar") {
         var [datasets, labels, count] = [[], [], 0];
-        for (const key in sortedData) {
+        for (const [label, value] of sortedData) {
             if (count == limit) {
                 break;
             }
-            labels.push(sortedData[key][0]);
-            datasets.push(sortedData[key][1].flips);
+            labels.push(label);
+            datasets.push(value.flips);
             count += 1;
         }
         const graphData = {
@@ -77,13 +78,13 @@ function get_most_flaky_data(dataType, graphType, filteredData, ignore, recent, 
         };
         return [graphData, data];
     } else if (graphType == "timeline") {
-        var [labels, runStartsSet, count, runLabelsSet] = [[], new Set(), 0, new Set()];
-        for (const key in sortedData) {
+        var [labels, runStartsSet, count] = [[], new Set(), 0];
+        for (const [label, value] of sortedData) {
             if (count == limit) {
                 break;
             }
-            labels.push(sortedData[key][0]);
-            for (const runStart of sortedData[key][1].run_starts) {
+            labels.push(label);
+            for (const runStart of value.run_starts) {
                 runStartsSet.add(runStart);
             }
             count += 1;
@@ -96,16 +97,18 @@ function get_most_flaky_data(dataType, graphType, filteredData, ignore, recent, 
         for (const runStart of runStarts) {
             for (const label of labels) {
                 const foundValues = groups.get(label).get(runStart) ?? [];
-                foundValues.forEach(value => runLabelsSet.add(get_run_label(value)));
                 if (foundValues.length > 0) {
                     const value = foundValues[0];
                     const [status, attempts] = status_of(value);
                     const statusName = status === "passed" ? "PASS" : status === "failed" ? "FAIL" : "SKIP";
+                    const rawRunStart = get_raw_run_start(value);
                     pointMeta[`${label}::${runAxis}`] = {
                         status: statusName,
                         elapsed_s: value.elapsed_s || 0,
                         message: value.message || '',
                         attempts,
+                        run_start: rawRunStart,
+                        full_name: value.full_name,
                     };
                     const config = status === "passed" ? passedConfig : status === "failed" ? failedConfig : skippedConfig;
                     const rerunConfig = attempts.length > 0 ? { borderColor: rerunBorderColor, borderWidth: rerunBorderWidth } : {};
@@ -114,12 +117,12 @@ function get_most_flaky_data(dataType, graphType, filteredData, ignore, recent, 
                         data: [{ x: [runAxis, runAxis + 1], y: label }],
                         ...config,
                         ...rerunConfig,
+                        ...get_test_note_marker(rawRunStart, value.full_name),
                     });
                 }
             }
             runAxis += 1;
         }
-        if (settings.show.aliases === "alias" || settings.show.aliases === "run_name") { runStarts = [...runLabelsSet] }
         datasets = convert_timeline_data(datasets)
         var graphData = {
             labels: labels,

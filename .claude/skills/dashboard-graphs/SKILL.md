@@ -1,6 +1,6 @@
 ---
 name: dashboard-graphs
-description: What each dashboard page (Overview, Dashboard, Compare, Tables) shows, the Chart.js architecture (get_graph_config, chart_factory, supported chart types), which graph_data / graph_creation module owns each graph, and the step-by-step checklist for adding a new graph (graphmetadata entry, naming rules, data + creation modules, tooltips, tests, docs). Use when adding or changing a graph, chart type, tooltip, or page section.
+description: Dashboard pages, Chart.js architecture, which graph_data/graph_creation module owns each graph, and the checklist for adding a graph. Use when adding or changing a graph, chart type, tooltip, or page section.
 ---
 
 # Dashboard Pages and Charts
@@ -94,7 +94,31 @@ Steps:
 6. **`js/variables/settings.js`** — nothing for plain graphs (types and show/hide lists are derived). Only add a `settings.switch.*` entry if the graph gets its own toggle (e.g. `ignoreSkips`), wired in `eventlisteners/graph_view_buttons.js` and persisted via `set_local_storage_item`.
 7. **Template** — nothing; sections already exist (`#runStatisticsSection` … `#runDataHidden`). Compare/Table graphs are the exception and have their own markup patterns in `graphmetadata.js` (`_tableHtml`).
 8. **CSS** — only for a new `viewOptionClassMap` icon class (`css/components/06-graphs.css`).
-9. **Tests** — reference screenshot for the section changes: regenerate `dashboard_output/<section>/base<Section>Section.png` in Docker; add a JS unit test for the `graph_data` function.
+9. **Tests** — reference screenshot for the section changes: regenerate `dashboard_output/dashboard<Section>Section.png` in Docker and update the data snapshot `__snapshots__/03_dashboard/dashboard<Section>Section.json` (`REFERENCE_RUN`, `testing` skill); add a JS unit test for the `graph_data` function.
 10. **Docs** — row in the section table of `docs/graphs-tables.md` (Graph Name / Views / Views Description / Notes).
 
 Verify: regenerate the dashboard (`dev-workflow` skill), open the section, switch every view option, toggle fullscreen, hide/show it in Customize mode, reload — position and type must persist.
+
+---
+
+## Custom graphs (user-built, issue #255)
+
+Not part of `graphmetadata.js`: users build them in the builder modal and they are stored as panel specs in `settings.customGraphs`. Code in `js/customgraphs/`:
+
+| File | Role |
+|---|---|
+| `fields.js` | Field catalog per source (runs/suites/tests/keywords/exceptions + run fields joined on every source), operators per field type, aggregations with their `sums` / `statusSplit` flags |
+| `engine.js` | `run_custom_graph_query(spec, data, {runLabel, rowFilter, suitePaths})` → result table `{xKind, x, xLabels, series[], meta}`; rows normalised once per filtered array (WeakMap cache). `x` and series keys are unique; placeholder groups use ` ` keys, so show `xLabels` / `series[].label`, never the keys |
+| `spec.js` | `validate_custom_graph_spec` (never trust a json config: unknown keys, newer `v`, unsafe regexes), `sanitize_custom_graph_spec` (repairs the builder draft after each change), the status-grouping and percent rules, viz types / orders |
+| `presets.js` | Gallery specs; every preset is run by `tests/javascript/customgraphs/spec.test.js` |
+| `viz.js` | Result table → `get_graph_config` config (line/bar/stacked/hbar/donut) or a table |
+| `widgets.js` | Grid tiles, `normalize_custom_graphs` (ids/sections, once in `setup_graph_order`), `create_custom_graphs`/`update_custom_graphs` (called from `all.js`), save/duplicate/delete, chart registry. Does not import `builder.js`: `layout.js` passes `open_custom_graph_builder` to `setup_custom_graph_buttons` |
+| `builder.js` | The `#customGraphModal` (gallery / builder / JSON tabs, live preview) |
+
+Rules the engine relies on:
+- A run/suite/keyword row grouped by status lands in every status it has counts for; only aggregations flagged `statusSplit` (count, passed, failed, skipped) stay correct there, so `get_custom_graph_aggs(source, statusGrouped)` offers only those.
+- `percent` needs a split by and a `sums` aggregation (`custom_graph_supports_percent`).
+- The heatmap places cells on the keys and maps them to labels in the tick and tooltip callbacks; run labels are not unique.
+
+Adding a field: one entry in `fields.js` + the value in `build_custom_graph_rows` (engine.js) + a unit test. Adding a preset: one entry in `presets.js` + a row in `docs/custom-graphs.md`. `viz.js` is unit tested in `viz.test.js`. Robot coverage lives in `08_layout.robot` (`Get Custom Graphs In Grid` reads charts via `Chart.getChart(canvas)`).
+

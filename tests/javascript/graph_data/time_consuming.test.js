@@ -23,7 +23,8 @@ vi.mock('@js/variables/chartconfig.js', () => ({
         borderColor: 'rgba(54, 162, 235)',
     },
 }));
-vi.mock('@js/graph_data/helpers.js', () => ({
+vi.mock('@js/graph_data/helpers.js', async () => ({
+    ...(await vi.importActual('@js/graph_data/helpers.js')),
     convert_timeline_data: (datasets) => {
         const grouped = {};
         for (const ds of datasets) {
@@ -203,5 +204,14 @@ describe('get_most_time_consuming_or_most_used_data', () => {
             expect(callbackData.aliases).toBeDefined();
             expect(callbackData.details).toBeDefined();
         });
+    });
+});
+
+describe('get_most_time_consuming_or_most_used_data with no data', () => {
+    it('returns empty graph data for only the last run instead of throwing', () => {
+        for (const graphType of ['bar', 'timeline']) {
+            const [graphData] = get_most_time_consuming_or_most_used_data('test', graphType, [], true, false);
+            expect(graphData.labels ?? []).toEqual([]);
+        }
     });
 });

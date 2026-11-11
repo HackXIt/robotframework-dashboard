@@ -2,15 +2,17 @@ import { get_run_label, settings } from '../variables/settings.js';
 import { compareRunIds } from '../variables/graphs.js';
 import { set_local_storage_item } from '../localstorage.js';
 import { filteredKeywords, filteredRuns, filteredSuites, filteredTests } from '../variables/globals.js';
+import { parse_test_tags } from '../common.js';
+import { get_keyword_select_key, is_test_in_suite } from '../graph_data/helpers.js';
 
 // function to update the available runs in the selects
 function setup_runs_in_compare_selects() {
     const selects = compareRunIds.map(id => document.getElementById(id));
-    const items = filteredRuns.map(run => get_run_label(run));
     selects.forEach(select => select.innerHTML = "")
     selects.forEach(select => {
         select.options.add(new Option("None", "None"));
-        items.forEach(item => select.options.add(new Option(item, item)));
+        // the value is the run_start: with run name labels several runs share a label
+        filteredRuns.forEach(run => select.options.add(new Option(get_run_label(run), run.run_start)));
     });
     selects[0].selectedIndex = selects[0].options.length - 1;
     selects[1].selectedIndex = selects[1].options.length - 2;
@@ -106,10 +108,8 @@ function setup_tests_in_select() {
     const testNames = new Set();
     for (const test of filteredTests) {
         if (testNames.has(test.name)) continue;
-        const isInSuite = settings.switch.suitePathsTestSection
-            ? test.full_name.includes(`${suiteSelectTests}.${test.name}`) || suiteSelectTests === "All"
-            : test.full_name.includes(`.${suiteSelectTests}.${test.name}`) || suiteSelectTests === "All"
-        const hasTag = testTagsSelect === "All" || test.tags.includes(testTagsSelect);
+        const isInSuite = is_test_in_suite(test, suiteSelectTests, settings.switch.suitePathsTestSection);
+        const hasTag = testTagsSelect === "All" || parse_test_tags(test.tags).includes(testTagsSelect);
         if (isInSuite && hasTag) {
             testNames.add(test.name);
         }
@@ -125,14 +125,8 @@ function setup_testtags_in_select() {
     const testTagsSelect = document.getElementById("testTagsSelect");
     testTagsSelect.innerHTML = "";
     const testTags = [...new Set(filteredTests.reduce((tags, test) => {
-        if (settings.switch.suitePathsTestSection) {
-            if (test.full_name.includes(`${suiteSelectTests}.${test.name}`) || suiteSelectTests === "All") {
-                test.tags.replace(/\[|\]/g, "").split(",").forEach(tag => tags.push(tag.trim()));
-            }
-        } else {
-            if (test.full_name.includes(`.${suiteSelectTests}.${test.name}`) || suiteSelectTests === "All") {
-                test.tags.replace(/\[|\]/g, "").split(",").forEach(tag => tags.push(tag.trim()));
-            }
+        if (is_test_in_suite(test, suiteSelectTests, settings.switch.suitePathsTestSection)) {
+            tags.push(...parse_test_tags(test.tags));
         }
         return tags;
     }, []))].filter(Boolean);
@@ -145,17 +139,7 @@ function setup_testtags_in_select() {
 function setup_keywords_in_select() {
     const keywordSelect = document.getElementById("keywordSelect");
     keywordSelect.innerHTML = "";
-    const useLibraryNames = settings?.switch?.useLibraryNames === true;
-
-    const keywordNames = [
-        ...new Set(
-            filteredKeywords.map(keyword =>
-                useLibraryNames && keyword.owner
-                    ? `${keyword.owner}.${keyword.name}`
-                    : keyword.name
-            )
-        )
-    ].sort();
+    const keywordNames = [...new Set(filteredKeywords.map(get_keyword_select_key))].sort();
 
     keywordNames.forEach(keywordName => {
         keywordSelect.options.add(new Option(keywordName, keywordName));

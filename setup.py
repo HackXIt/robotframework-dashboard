@@ -12,7 +12,7 @@ extras["all"] = sorted({pkg for group in extras.values() for pkg in group})
 
 setup(
     name="robotframework-dashboard",
-    version="2.4.1",
+    version="2.5.0",
     description="Output processor and dashboard generator for Robot Framework output files",
     long_description="""# 📊 Robot Framework Dashboard
 
@@ -64,6 +64,8 @@ For all available CLI options see the [Basic CLI docs](https://marketsquare.gith
 - 📄 **Dashboard Pages** - Overview, Dashboard, and Compare pages for multi-level insights.  
 - 🎛️ **Customizable Layouts** - Drag-and-drop sections with adjustable size and order.  
 - 📊 **Graph Customization** - Toggle legends, axis titles, labels, and control animations.  
+- 📈 **Custom Graphs** - Build your own graphs from a gallery of presets or from scratch: pick the data, filters, grouping, metric and chart type, and share them as JSON.  
+- 🗒️ **Test Notes** - Opt-in: add notes and your own categories to test results, for example a link to the bug, right from the graphs. Notes are kept in the browser and can be exported.  
 - 🔎 **Global Filters** - Filter runs by name, tags, date, metadata, or quantity. Drag across the runs-over-time histogram to zoom into a period. Every filter option shows how many runs it still matches, and options that match none are greyed out.  
 - ⚖️ **Comparison Mode** - Compare up to 4 runs side by side with visual statistics.  
 - 🔗 **Automatic Log Linking** - Open Robot Framework logs directly from the dashboard.  
@@ -117,6 +119,7 @@ This project is licensed under the MIT License.
     packages=find_packages(),
     include_package_data=True,
     zip_safe=False,
+    python_requires=">=3.9",
     install_requires=[
         "robotframework>=6.0",
     ],

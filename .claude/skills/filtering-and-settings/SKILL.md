@@ -1,6 +1,6 @@
 ---
 name: filtering-and-settings
-description: The dashboard's global filter modal and pipeline (runs, run tags AND/OR/NOT, dates, amount, metadata, versions, custom filters, filter profiles), the settings object and localStorage persistence, JSON config, and the GridStack layout editor. Use when a bug or feature touches filters, the overview→dashboard navigation pre-filters, settings toggles, or saved layouts.
+description: Filter modal and pipeline (runs, run tags, dates, metadata, versions, profiles), overview→dashboard pre-filters, settings + localStorage, JSON config, GridStack layout editor. Use for any filter, settings toggle, or saved layout task.
 ---
 
 # Filtering, Settings, and Layout
@@ -30,12 +30,14 @@ The `settings` object is the single source of truth for all dashboard configurat
 | `graphTypes` | Object | Per-graph chart type (e.g. `"bar"`, `"line"`, `"percentages"`) |
 | `view` | Object | Per-page `sections: {show, hide}` and `graphs: {show, hide}` lists for overview, unified, dashboard, compare, tables |
 
-**localStorage-only keys** (not in the defaults object but always preserved during merge — whitelist lives in `merge_deep()`):
+**localStorage-only keys** (not in the defaults object but always preserved during merge — listed in `LOCAL_ONLY_SETTINGS` in `localstorage.js`):
 - `layouts` — GridStack position data per section
 - `libraries` — keyword library show/hide toggles
 - `theme` — `"dark"` or `"light"`
 - `filterProfiles` — named filter state snapshots
-- `statWidgets`, `linkWidgets`, `customSections` — user-created widgets/sections (see `js-features` skill)
+- `statWidgets`, `linkWidgets`, `customSections`, `customGraphs` — user-created widgets/sections/graphs (see `js-features` skill; custom graphs honour the global filters unless their `useGlobalFilters` is false, and the section filters only when their `useSectionFilters` is true, independent of the "filters affect top graphs" switches)
+
+**Section filter matching is shared**: `get_test_section_predicate()` (suite / test / tag selects of the test section) and `get_keyword_select_key()` (`Library.Keyword` with library names on) live in `graph_data/helpers.js` next to `get_suite_data_exclusion()`. The built-in graphs and the custom graphs both use them; change the matching rules there, not at the call sites.
 
 ---
 
